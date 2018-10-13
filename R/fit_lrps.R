@@ -64,8 +64,7 @@
 
   X1 <- S - A - (Uhat / mu)
   X1 <- 0.5 * (X1 + t(X1))
-  #eig <- eigen(X1)
-  eig <- eigs_sym(X1, opts$max.rank)
+  eig <- RSpectra::eigs_sym(X1, opts$max.rank)
   eigVal <- eig$values - lp2
   eigVal[eigVal < 0] <- 0
   L <- eig$vectors %*% diag(eigVal) %*% t(eig$vectors)
@@ -241,7 +240,7 @@ fit.low.rank.plus.sparse <- function(Sigma, Lambda1, Lambda2, n, init=NULL,
   options$p <- p
 
   if (is.null(init)) {
-    S <- ginv(Sigma)
+    S <- MASS::ginv(Sigma)
     L <- S * 0.01
     A <- S - L #+ diag(rep(1, p))
     U <- mu * (A - S + L)

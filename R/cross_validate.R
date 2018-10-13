@@ -15,7 +15,8 @@ cross.validate.low.rank.plus.sparse <- function(X,
                                                 tol=1e-05,
                                                 max.iter=2000,
                                                 mu=0.1,
-                                                verbose=FALSE) {
+                                                verbose=FALSE,
+                                                seed=NA) {
   library(cvTools)
   library(RSpectra)
   library(Matrix)
@@ -48,8 +49,10 @@ cross.validate.low.rank.plus.sparse <- function(X,
   for (i in 1:length(path)) {
     valid.lambdas <- c(valid.lambdas, path[[i]]$lambda)
   }
-
-  folds <- cvFolds(n, K=n.folds)
+  if(!is.na(seed)) {
+    set.seed(seed)
+  }
+  folds <- cvTools::cvFolds(n, K=n.folds)
   X <- X[folds$subsets[,1],]
 
   log.liks <- matrix(NA, ncol=2)
@@ -80,7 +83,7 @@ cross.validate.low.rank.plus.sparse <- function(X,
 
       # Compute the log likelihood on the testing set
       A <- fitll$S - fitll$L
-      evals <- eigs_sym(A, min(n-1,p-1))$values
+      evals <- RSpectra::eigs_sym(A, min(n-1,p-1))$values
       evals[abs(evals) < 1e-05] <- 1e-16
       if (any(evals < 0)) {
         ll <- NaN

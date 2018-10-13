@@ -41,7 +41,7 @@ fit.low.rank.plus.sparse.path <- function(Sigma,
     path[[counter]]$gamma <- gamma
     path[[counter]]$fit <- fit
 
-    rank.L <- as.numeric(rankMatrix(fit$L))
+    rank.L <- as.numeric(Matrix::rankMatrix(fit$L))
     S <- (fit$S!=0) - diag(diag(fit$S!=0))
     sparsity <- 0.5 * sum(S)
     n.edges <- sparsity
