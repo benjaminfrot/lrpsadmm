@@ -1,0 +1,20 @@
+#' Estimate the correlation matrix of a semiparametric elliptical
+#' copula using a modified Kendall rank correlation matrix
+#'
+#' @title Estimate the scale matrix of a semiparametric elliptical copula (a.k.a.
+#' transelliptical distribution).
+#' @param X An n x p data matrix.
+#' @return A p x p correlation matrix.
+#' @details Given X, an n x p data matrix, let K be its Kendall correlation matrix.
+#' This function first computes \code{Chat <- sin(0.5*pi*K)} and projects it onto the
+#' space of correlation matrices (in Frobenius norm) using the \code{nearPD} function
+#' of the \code{Matrix} package
+#' @import pcaPP Matrix
+#' @export
+Kendall.correlation.estimator <- function(X) {
+  library(pcaPP)
+  C <- pcaPP::cor.fk(X)
+
+  # Make sure it is a correlation matrix
+  as.matrix(Matrix::nearPD(sin(0.5 * pi * C), corr = T)$mat)
+}
