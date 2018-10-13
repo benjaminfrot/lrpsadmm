@@ -40,7 +40,7 @@
   A <- 0.5 * (A + t(A))
 
   ps$A <- A
-
+  ps$exit <- F
   ps
 }
 
@@ -64,14 +64,22 @@
 
   X1 <- S - A - (Uhat / mu)
   X1 <- 0.5 * (X1 + t(X1))
-  eig <- RSpectra::eigs_sym(X1, opts$max.rank)
+  eig <- tryCatch({
+    RSpectra::eigs_sym(X1, opts$max.rank)
+    }, 
+    error = function(e) {
+      print(e)
+      ps$exit = T
+      return(ps)
+  }
+  )
   eigVal <- eig$values - lp2
   eigVal[eigVal < 0] <- 0
   L <- eig$vectors %*% diag(eigVal) %*% t(eig$vectors)
   L <- 0.5 * (L + t(L))
 
   ps$L <- L
-
+  ps$exit <- F
   ps
 }
 
@@ -93,7 +101,7 @@
   S <- 0.5 * (S + t(S))
 
   ps$S <- S
-
+  ps$exit <- F
   ps
 }
 
@@ -133,7 +141,7 @@
   U <- 0.5 * (U + t(U))
 
   ps$U <- U
-
+  ps$exit <- F
   ps
 }
 
@@ -147,6 +155,9 @@
   fs <- c(.updateA, .updateS, .updateL, .updateU)
   for (f in fs) {
     ps <- f(ps, opts)
+    if(ps$exit) {
+      break()
+    }
   }
 
   pck <- ps$ck
