@@ -83,7 +83,12 @@ cross.validate.low.rank.plus.sparse <- function(X,
 
       # Compute the log likelihood on the testing set
       A <- fitll$S - fitll$L
-      evals <- RSpectra::eigs_sym(A, min(n-1,p-1))$values
+      evals <- tryCatch({
+      RSpectra::eigs_sym(A, min(n-1,p-1))$values}, 
+      error = function(e) {
+        print(e)
+        c(-10)
+      })
       evals[abs(evals) < 1e-05] <- 1e-16
       if (any(evals < 0)) {
         ll <- NaN

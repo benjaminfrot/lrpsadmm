@@ -69,7 +69,6 @@
     }, 
     error = function(e) {
       print(e)
-      print('hi')
       ps$exit = T
       return(ps)
   }
