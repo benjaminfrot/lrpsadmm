@@ -12,7 +12,6 @@
 #' @import pcaPP Matrix
 #' @export
 Kendall.correlation.estimator <- function(X) {
-  library(pcaPP)
   C <- pcaPP::cor.fk(X)
 
   # Make sure it is a correlation matrix

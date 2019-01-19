@@ -14,12 +14,11 @@ fit.low.rank.plus.sparse.path <- function(Sigma,
                                           max.iter=2000,
                                           mu=0.1,
                                           verbose=FALSE) {
-  library(Matrix)
   p <- dim(Sigma)[1]
 
   if(is.null(lambdas)) {
     if (is.null(lambda.max)) {
-      lambda.max = max(abs(Sigma - diag(diag(Sigma)))) * 10
+      lambda.max <- max(abs(Sigma - diag(diag(Sigma)))) * 10
     }
     lambda.min <- lambda.max * lambda.ratio
     reason <- lambda.min / lambda.max
@@ -31,8 +30,9 @@ fit.low.rank.plus.sparse.path <- function(Sigma,
   for (lambda in lambdas) {
     l1 <- gamma * lambda
     l2 <- (1 - gamma) * lambda
-    fit <- fit.low.rank.plus.sparse(Sigma, l1, l2, n, init=fit, maxiter = max.iter,
-                                    mu=mu, tol=tol, print_progress = F)
+    fit <- fit.low.rank.plus.sparse(Sigma, l1, l2, n, init=fit, 
+                                    maxiter = max.iter,
+                                    mu=mu, tol=tol, print_progress = FALSE)
     if (fit$termcode == -2) {
       next()
     }

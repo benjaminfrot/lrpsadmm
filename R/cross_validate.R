@@ -1,5 +1,6 @@
 #' Perform K-fold cross-validation for the Low-Rank plus Sparse estimator
 #' @import cvTools RSpectra Matrix
+#' @importFrom stats cor sd
 #' @export
 cross.validate.low.rank.plus.sparse <- function(X,
                                                 gamma,
@@ -17,34 +18,33 @@ cross.validate.low.rank.plus.sparse <- function(X,
                                                 mu=0.1,
                                                 verbose=FALSE,
                                                 seed=NA) {
-  library(cvTools)
-  library(RSpectra)
-  library(Matrix)
+
   Sigma <- covariance.estimator(X)
   p <- dim(Sigma)[1]
-
+  
   if(is.null(lambdas)) {
     if (is.null(lambda.max)) {
-      max.cor = max(abs(Sigma - diag(diag(Sigma)))) * 2
+      max.cor <- max(abs(Sigma - diag(diag(Sigma)))) * 2
       lambda.max <- max.cor / gamma
     }
     lambda.min <- lambda.max * lambda.ratio
     reason <- lambda.min / lambda.max
     lambdas <- lambda.max * reason **((0:n.lambdas)/n.lambdas)
   }
-
+  
   # Start by computing the whole path on the full dataset.
   if (verbose) {
     print ("### Computing the path on the full dataset first ###")
   }
   path <- fit.low.rank.plus.sparse.path(Sigma, gamma, n, lambdas = lambdas,
-                                        max.sparsity = max.sparsity, max.rank = max.rank,
+                                        max.sparsity = max.sparsity, 
+                                        max.rank = max.rank,
                                         tol = tol, max.iter = max.iter, mu = mu,
                                         verbose = verbose)
   if (verbose) {
     print(paste("### Now performing ", n.folds, " fold cross validation. ###"))
   }
-
+  
   valid.lambdas <- c()
   for (i in 1:length(path)) {
     valid.lambdas <- c(valid.lambdas, path[[i]]$lambda)
@@ -54,7 +54,7 @@ cross.validate.low.rank.plus.sparse <- function(X,
   }
   folds <- cvTools::cvFolds(n, K=n.folds)
   X <- X[folds$subsets[,1],]
-
+  
   log.liks <- matrix(NA, ncol=2)
   for (lambda in valid.lambdas) {
     l1 <- gamma * lambda
@@ -80,26 +80,28 @@ cross.validate.low.rank.plus.sparse <- function(X,
         lls <- c(lls, ll)
         break()
       }
-
+      
       # Compute the log likelihood on the testing set
       A <- fitll$S - fitll$L
       evals <- tryCatch({
-      RSpectra::eigs_sym(A, min(n-1,p-1))$values}, 
-      error = function(e) {
-        print(e)
-        c(-10)
-      })
+        # In some cases this does not converge.
+        RSpectra::eigs_sym(A, min(n-1,p-1))$values}, 
+        error = function(e) {
+          print(e)
+          c(-10)
+        })
       evals[abs(evals) < 1e-05] <- 1e-16
       if (any(evals < 0)) {
         ll <- NaN
         lls <- c(lls, ll)
         break()
       }
-
+      
       ll <- sum(diag(Stest %*% A)) - sum(log(evals))
       lls <- c(lls, ll)
     }
     if (any(is.nan(lls))) {
+      path[[index]] <- NULL
       next()
     }
     mean.ll <- mean(lls)
@@ -107,10 +109,12 @@ cross.validate.low.rank.plus.sparse <- function(X,
     path[[index]]$mean_xval_ll <- mean.ll
     path[[index]]$sd_xval_ll <- sd.ll
     if(verbose) {
-      print(paste("Lambda:", lambda, "X-Val Log-lik:", mean.ll, "#Edges:", path[[index]]$number.of.edges))
+      print(paste("Lambda:", lambda, "X-Val Log-lik:", 
+                  mean.ll, "#Edges:", 
+                  path[[index]]$number.of.edges))
     }
   }
-
+  
   path
 }
 
@@ -137,9 +141,9 @@ choose.cross.validate.low.rank.plus.sparse <- function(xval.path, method="min") 
   if (method == "min") {
     return(xval.path[[min.index]])
   }
-
+  
   if (method == "hastie") {
-
+    
     for (i in 1:length(xval.path)) {
       if (xval.path[[i]]$lambda < min.lambda) {
         next()
@@ -151,9 +155,9 @@ choose.cross.validate.low.rank.plus.sparse <- function(xval.path, method="min") 
         min.lambda <- xval.path[[i]]$lambda
       }
     }
-
+    
     return(xval.path[[min.index]])
-
+    
   } else {
     stop("Method has to be 'min' or 'hastie'.")
   }
@@ -175,7 +179,7 @@ show.cross.validate.low.rank.plus.sparse <- function(lrps.path, ground.truth=NUL
     sparsities <- c(sparsities, lrps.path[[i]]$sparsity)
     mean.lls <- c(mean.lls, lrps.path[[i]]$mean_xval_ll)
     sd.lls <- c(sd.lls, lrps.path[[i]]$sd_xval_ll)
-
+    
     if(!is.null(ground.truth)) {
       S <- lrps.path[[i]]$fit$S
       S <- (S!=0) - diag(diag(S!=0))
@@ -187,7 +191,7 @@ show.cross.validate.low.rank.plus.sparse <- function(lrps.path, ground.truth=NUL
       }
     }
   }
-
+  
   par(mfrow=c(2,2))
   plot(-log(lambdas), mean.lls, xlab="-Log10(Lambda)", ylab="Cross-Validated LogLik",
        ylim=c(min(mean.lls-sd.lls), max(mean.lls+sd.lls)))

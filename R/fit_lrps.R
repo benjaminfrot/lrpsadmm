@@ -7,7 +7,7 @@
   l2 <- opts$lp2 * opts$mu
   X <- ps$S - ps$L
   X <- 0.5 * (X + t(X))
-  evals <- eigen(X, symmetric = T)$val
+  evals <- eigen(X, symmetric = TRUE)$val
   evals[abs(evals) < 1e-08] <- 1e-16
   if (any(evals < 0)) {
     return(NaN)
@@ -16,7 +16,7 @@
   ll <- sum(diag(C %*% X)) - sum(log(evals))
   # + Penalty
   ll <- ll + l1 * sum(abs(ps$S)) + l2 * sum(diag(ps$L))
-
+  
   ll
 }
 
@@ -30,15 +30,15 @@
   Uhat <- ps$Uhat
   n <- opts$n
   p <- opts$p
-
+  
   X1 <- mu * (Shat - Lhat) - C - Uhat
   X2 <- X1 %*% X1 + 4 * mu * diag(dim(X1)[1])
   X2 <- 0.5 * (X2 + t(X2))
-  eig <- eigen(X2, symmetric = T)
+  eig <- eigen(X2, symmetric = TRUE)
   sqrtX2 <- eig$vectors %*% diag(sqrt(eig$values)) %*% t(eig$vectors)
   A <- (X1 + sqrtX2) / (2 * mu)
   A <- 0.5 * (A + t(A))
-
+  
   ps$A <- A
   ps$exit <- F
   ps
@@ -48,7 +48,7 @@
   alpha <- ps$alpha[length(ps$alpha)]
   alpha <- 0.5 * (1 + sqrt(1 + 4 * alpha**2))
   ps$alpha <- c(ps$alpha, alpha)
-
+  
   ps
 }
 
@@ -61,23 +61,23 @@
   S <- ps$S
   Uhat <- ps$Uhat
   ps$prevL <- ps$L
-
+  
   X1 <- S - A - (Uhat / mu)
   X1 <- 0.5 * (X1 + t(X1))
   eig <- tryCatch({
     RSpectra::eigs_sym(X1, opts$max.rank)
-    }, 
-    error = function(e) {
-      print(e)
-      ps$exit = T
-      return(ps)
+  }, 
+  error = function(e) {
+    print(e)
+    ps$exit <- TRUE
+    return(ps)
   }
   )
   eigVal <- eig$values - lp2
   eigVal[eigVal < 0] <- 0
   L <- eig$vectors %*% diag(eigVal) %*% t(eig$vectors)
   L <- 0.5 * (L + t(L))
-
+  
   ps$L <- L
   ps$exit <- F
   ps
@@ -92,16 +92,16 @@
   L <- ps$L
   Uhat <- ps$Uhat
   ps$prevS <- ps$S
-
+  
   X1 <- A + L + (Uhat / mu)
   X2 <- abs(X1) - lp1
   X2[X2 <= 0] <- 0
-  S = X2 * sign(X1)
+  S <- X2 * sign(X1)
   S <- S * opts$zeros
   S <- 0.5 * (S + t(S))
-
+  
   ps$S <- S
-  ps$exit <- F
+  ps$exit <- FALSE
   ps
 }
 
@@ -114,15 +114,15 @@
   pU <- ps$prevU
   alpha_k_min_1 <- ps$alpha[length(ps$alpha)-2]
   alpha_k_plus_1 <- ps$alpha[length(ps$alpha)]
-
+  
   Shat <- S + (alpha_k_min_1 / alpha_k_plus_1) * (S - pS)
   Lhat <- L + (alpha_k_min_1 / alpha_k_plus_1) * (L - pL)
   Uhat <- U + (alpha_k_min_1 / alpha_k_plus_1) * (U - pU)
-
+  
   ps$Shat <- Shat
   ps$Lhat <- Lhat
   ps$Uhat <- Uhat
-
+  
   ps
 }
 
@@ -136,22 +136,22 @@
   L <- ps$L
   Uhat <- ps$Uhat
   ps$prevU <- ps$U
-
+  
   U <- Uhat + mu * (A - S + L)
   U <- 0.5 * (U + t(U))
-
+  
   ps$U <- U
-  ps$exit <- F
+  ps$exit <- FALSE
   ps
 }
 
 
 .split.bregman.low.rank.plus.sparse.update.parameters <- function(ps, opts) {
-
+  
   pL <- ps$L
   pS <- ps$S
   pU <- ps$U
-
+  ps$exit <- FALSE
   fs <- c(.updateA, .updateS, .updateL, .updateU)
   for (f in fs) {
     ps <- f(ps, opts)
@@ -159,7 +159,7 @@
       break()
     }
   }
-
+  
   pck <- ps$ck
   ck <- (1.0 / opts$mu) * sum((ps$Uhat - ps$U)**2) +
     opts$mu * (sum((ps$Shat - ps$Lhat - ps$S + ps$L)**2))
@@ -176,7 +176,7 @@
     ps$Lhat <- pL
     ps$alpha <- c(ps$alpha, 1.0)
   }
-
+  
   # One problem with restarting when the value of mu is not
   # good is that it "flip-flops": alternating restart and non-restart
   # endlessly. When that happens 100 times in a row, we reduce the value of mu.
@@ -184,15 +184,15 @@
     if (all(ps$restarts[(length(ps$restarts)-99):length(ps$restarts)] ==
             rep(c(0,1), 50))) {
       # then we know it flip-flops.
-      msg1 = "The accelerated ADDM algorithm restarted 100 times in a row."
-      msg2 = "It seems like the required convergence tolerance cannot be achieved."
-      msg3 = "This might due to the problem being too ill-posed. For example, the value of gamma might be too large given the ratio p/n."
-      msg4 = "You might also want to consider trying a smaller value of mu."
+      msg1 <- "The accelerated ADMM algorithm restarted 100 times in a row."
+      msg2 <- "It seems like the required convergence tolerance cannot be achieved."
+      msg3 <- "This might due to the problem being too ill-posed. For example, the value of gamma might be too large given the ratio p/n."
+      msg4 <- "You might also want to consider trying a smaller value of mu.\n"
       warning(paste(msg1, msg2, msg3, msg4))
       ps$exit <- TRUE
     }
   }
-
+  
   list(ps=ps, opts=opts)
 }
 
@@ -227,10 +227,7 @@ fit.low.rank.plus.sparse <- function(Sigma, Lambda1, Lambda2, n, init=NULL,
                                      maxiter=2000, mu=0.1, tol=1e-05, eta=0.999,
                                      print_progress=T, print_every=20,
                                      zeros=NULL, max.rank=NA) {
-  library(matrixcalc)
-  library(RSpectra)
-  library(MASS)
-
+  
   if (is.null(zeros)) {
     zeros <- 1
   }
@@ -238,7 +235,7 @@ fit.low.rank.plus.sparse <- function(Sigma, Lambda1, Lambda2, n, init=NULL,
   if(is.na(max.rank)) {
     max.rank <- ceiling(min(n-1, p-1))
   }
-
+  
   options <- list()
   options$mu <- mu
   options$Sigma <- Sigma
@@ -249,7 +246,7 @@ fit.low.rank.plus.sparse <- function(Sigma, Lambda1, Lambda2, n, init=NULL,
   options$max.rank <- max.rank
   options$n <- n
   options$p <- p
-
+  
   if (is.null(init)) {
     S <- MASS::ginv(Sigma)
     L <- S * 0.01
@@ -257,9 +254,9 @@ fit.low.rank.plus.sparse <- function(Sigma, Lambda1, Lambda2, n, init=NULL,
     U <- mu * (A - S + L)
     parameters <- list(S=S, L=L, A=A, U=U)
   } else {
-    parameters = init
+    parameters <- init
   }
-
+  
   parameters$Shat <- parameters$S
   parameters$Lhat <- parameters$L
   parameters$alpha <- c(1.0, 1.0)
@@ -268,7 +265,7 @@ fit.low.rank.plus.sparse <- function(Sigma, Lambda1, Lambda2, n, init=NULL,
   parameters$ck <- p**2
   parameters$exit <- FALSE
   parameters$S <- parameters$S * options$zeros
-
+  
   diffs <- c()
   lls <- c(NaN)
   parameters$termcode <- -1
@@ -277,14 +274,15 @@ fit.low.rank.plus.sparse <- function(Sigma, Lambda1, Lambda2, n, init=NULL,
     L <- .split.bregman.low.rank.plus.sparse.update.parameters(parameters, options)
     new_parameters <- L$ps
     options <- L$opts
-
+    
     if(parameters$exit) {
       parameters$termcode <- -3
-      parameters$termmsg <- "Algorithm was restarted 100 times without improvement."
+      parameters$termmsg <- 
+        "Algorithm was restarted 100 times without improvement."
       break()
     }
-
-    if(sum(new_parameters$S) == 0) {
+    
+    if(any(diag(new_parameters$S) == 0)) {
       parameters$S <- diag(p)
       parameters$termcode <- -2
       parameters$termmsg <- "Shrinkage too strong: sparse component is empty."
@@ -292,14 +290,17 @@ fit.low.rank.plus.sparse <- function(Sigma, Lambda1, Lambda2, n, init=NULL,
     }
     # Compute the relative change in parameters with the previous iteration
     if ((matrixcalc::frobenius.norm(parameters$L) > 0)) {
-      diff <- matrixcalc::frobenius.norm(new_parameters$S - parameters$S) / matrixcalc::frobenius.norm(parameters$S) +
-        matrixcalc::frobenius.norm(new_parameters$L - parameters$L) / matrixcalc::frobenius.norm(parameters$L)
+      diff <- matrixcalc::frobenius.norm(new_parameters$S - parameters$S) / 
+        matrixcalc::frobenius.norm(parameters$S) +
+        matrixcalc::frobenius.norm(new_parameters$L - parameters$L) / 
+        matrixcalc::frobenius.norm(parameters$L)
     } else {
-      diff <- matrixcalc::frobenius.norm(new_parameters$S - parameters$S) / matrixcalc::frobenius.norm(parameters$S) +
+      diff <- matrixcalc::frobenius.norm(new_parameters$S - parameters$S) / 
+        matrixcalc::frobenius.norm(parameters$S) +
         matrixcalc::frobenius.norm(new_parameters$L - parameters$L)
     }
     diffs <- c(diffs, diff)
-
+    
     parameters <- new_parameters
     if (diff < tol) {
       parameters$termcode <- 0
@@ -320,7 +321,8 @@ fit.low.rank.plus.sparse <- function(Sigma, Lambda1, Lambda2, n, init=NULL,
     if ((print_progress) & (i > print_every)) {
       if((i %% print_every) == 0) {
         last_lls <- lls[(i-print_every):i]
-        avg_chg <- mean(abs(diff(last_lls)) / abs(last_lls[1:(print_every)]),na.rm=T)
+        avg_chg <- mean(abs(diff(last_lls)) / abs(last_lls[1:(print_every)]),
+                        na.rm=T)
         print(paste("Iteration:", i,
                     "Log-Likelihood:", ll,
                     "Avg relative log-likelihood change:", avg_chg,
@@ -328,11 +330,11 @@ fit.low.rank.plus.sparse <- function(Sigma, Lambda1, Lambda2, n, init=NULL,
       }
     }
   }
-
+  
   parameters$iter <-i
   parameters$diffs <- diffs
   parameters$lls <- lls
-
+  
   # Clean up the variables that are specific to the algo
   parameters$Shat <- NULL
   parameters$Lhat <- NULL
@@ -344,6 +346,7 @@ fit.low.rank.plus.sparse <- function(Sigma, Lambda1, Lambda2, n, init=NULL,
   parameters$prevS <- NULL
   parameters$prevL <- NULL
   parameters$prevU <- NULL
-
+  parameters$exit <- NULL
+  
   parameters
 }

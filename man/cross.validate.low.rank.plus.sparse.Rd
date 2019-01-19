@@ -8,7 +8,7 @@ cross.validate.low.rank.plus.sparse(X, gamma, n,
   covariance.estimator = cor, n.folds = 5, lambdas = NULL,
   lambda.max = NULL, lambda.ratio = 1e-04, n.lambdas = 20,
   max.sparsity = 0.5, max.rank = NA, tol = 1e-05, max.iter = 2000,
-  mu = 0.1, verbose = FALSE)
+  mu = 0.1, verbose = FALSE, seed = NA)
 }
 \description{
 Perform K-fold cross-validation for the Low-Rank plus Sparse estimator
