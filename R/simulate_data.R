@@ -1,10 +1,12 @@
 
-#' @title Generate data from a Gaussian graphical model with hidden variables
-#' @description 
-#'   A partitioned inverse covariance (precision) matrix K is constructed as \eqn{K := [K_X, K_{XL}; K_{XL}^T, K_L]}, where \eqn{K_X} is a p x p sparse matrix, 
+#' @title Simulate data from a Gaussian graphical model with hidden variables
+#' @description
+#'   A partitioned inverse covariance (precision) matrix K is constructed as \eqn{K := [K_X, K_{XL}; K_{XL}^T, K_L]}, where \eqn{K_X} is a p x p sparse matrix,
 #'   \eqn{K_{LX}} is a p x h matrix connecting the h hidden variables to observed ones and \eqn{K_L} is a h x h diagonal matrix.
-#'   
+#'
 #'   n samples are then drawn from a multivariate normal distribution: \eqn{N(0, K^{-1})} and only the first p variables are observed.
+#'
+#'   This function is here to demonstrate the features of the package.
 #' @param n Number of samples.
 #' @param p Number of observed variables.
 #' @param h Number of hidden variables.
@@ -25,11 +27,17 @@
 #'  n <- 2000 # Number of samples
 #'  p <- 100 # Number of variables
 #'  h <- 5 # Number of hidden variables
-#'  sim.data <- generate.latent.ggm.data(n=n, p=p, h=h, outlier.fraction = 0.0, 
+#'  sim.data <- generate.latent.ggm.data(n=n, p=p, h=h, outlier.fraction = 0.0,
 #'                                sparsity = 0.02, sparsity.latent = 0.7)
 #'  true.S <- sim.data$precision.matrix[-((p+1):(p+h)),-((p+1):(p+h))] # The sparse matrix
 #'  observed.data <- sim.data$obs.data
-#'  
+#'
+#'  # Generate data with 10 of samples drawn from a Cauchy
+#'  sim.data <- generate.latent.ggm.data(n=n, p=p, h=h, outlier.fraction = 0.1,
+#'                                sparsity = 0.02, sparsity.latent = 0.7)
+#'  true.S <- sim.data$precision.matrix[-((p+1):(p+h)),-((p+1):(p+h))] # The sparse matrix
+#'  observed.data <- sim.data$obs.data
+#'
 #' @import mvtnorm
 #' @importFrom stats runif rbinom
 #' @export
@@ -48,7 +56,7 @@ generate.latent.ggm.data <- function(n, p, h, sparsity=0.02, sparsity.latent=0.7
               ncol=h, nrow=p)
   S <- 0.5 * (S + t(S))
   true.prec.mat <- rbind(cbind(S, SLX), cbind(t(SLX), L))
-  true.prec.mat <- true.prec.mat - 
+  true.prec.mat <- true.prec.mat -
     min(eigen(true.prec.mat)$val) * diag(tot.var) + diag(tot.var)
   true.prec.mat <- cov2cor(true.prec.mat)
   true.cov.mat <- solve(true.prec.mat)

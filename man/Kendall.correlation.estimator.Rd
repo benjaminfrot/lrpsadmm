@@ -23,3 +23,11 @@ This function first computes \code{Chat <- sin(0.5*pi*K)} and projects it onto t
 space of correlation matrices (in Frobenius norm) using the \code{nearPD} function
 of the \code{Matrix} package
 }
+\examples{
+set.seed(0)
+# Data from a mixture semiparametric elliptical copula (Cauchy) / multivariate normal
+sim.data <- generate.latent.ggm.data(n=2000, p=100, h=5, outlier.fraction = 0.05,
+                                    sparsity = 0.02, sparsity.latent = 0.7)
+X <- sim.data$obs.data;
+Sigma.Kendall <- Kendall.correlation.estimator(X)
+}

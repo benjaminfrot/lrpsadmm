@@ -2,7 +2,7 @@
 % Please edit documentation in R/simulate_data.R
 \name{generate.latent.ggm.data}
 \alias{generate.latent.ggm.data}
-\title{Generate data from a Gaussian graphical model with hidden variables}
+\title{Simulate data from a Gaussian graphical model with hidden variables}
 \usage{
 generate.latent.ggm.data(n, p, h, sparsity = 0.02,
   sparsity.latent = 0.7, outlier.fraction = 0)
@@ -33,18 +33,26 @@ A list with keys:
  }
 }
 \description{
-A partitioned inverse covariance (precision) matrix K is constructed as \eqn{K := [K_X, K_{XL}; K_{XL}^T, K_L]}, where \eqn{K_X} is a p x p sparse matrix, 
+A partitioned inverse covariance (precision) matrix K is constructed as \eqn{K := [K_X, K_{XL}; K_{XL}^T, K_L]}, where \eqn{K_X} is a p x p sparse matrix,
   \eqn{K_{LX}} is a p x h matrix connecting the h hidden variables to observed ones and \eqn{K_L} is a h x h diagonal matrix.
-  
+
   n samples are then drawn from a multivariate normal distribution: \eqn{N(0, K^{-1})} and only the first p variables are observed.
+
+  This function is here to demonstrate the features of the package.
 }
 \examples{
  n <- 2000 # Number of samples
  p <- 100 # Number of variables
  h <- 5 # Number of hidden variables
- sim.data <- generate.latent.ggm.data(n=n, p=p, h=h, outlier.fraction = 0.0, 
+ sim.data <- generate.latent.ggm.data(n=n, p=p, h=h, outlier.fraction = 0.0,
                                sparsity = 0.02, sparsity.latent = 0.7)
  true.S <- sim.data$precision.matrix[-((p+1):(p+h)),-((p+1):(p+h))] # The sparse matrix
  observed.data <- sim.data$obs.data
- 
+
+ # Generate data with 10 of samples drawn from a Cauchy
+ sim.data <- generate.latent.ggm.data(n=n, p=p, h=h, outlier.fraction = 0.1,
+                               sparsity = 0.02, sparsity.latent = 0.7)
+ true.S <- sim.data$precision.matrix[-((p+1):(p+h)),-((p+1):(p+h))] # The sparse matrix
+ observed.data <- sim.data$obs.data
+
 }

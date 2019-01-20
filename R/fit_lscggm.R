@@ -18,7 +18,7 @@
   if (any(evals < 0)) {
     return(NaN)
   }
-  
+
   # Log-Likelihood
   ll1 <- sum(diag(CX %*% XX)) - sum(log(evals))
   ll2 <- 2 * sum(diag(CZX %*% XXZ))
@@ -26,7 +26,7 @@
   ll <- ll1 + ll2 + ll3
   # + Penalty
   ll <- ll + l1 * sum(abs(ps$S)) + l2 * sum(svd(ps$L)$d)
-  
+
   ll
 }
 
@@ -35,8 +35,8 @@
   svd.res <- svd(X)
   ss <- svd.res$d - rho
   ss[ss < 0] <- 0
-  
-  svd.res$u %*% diag(ss) %*% t(svd.res$v)  
+
+  svd.res$u %*% diag(ss) %*% t(svd.res$v)
 }
 
 .prox_f <- function(X, p, q) {
@@ -44,13 +44,10 @@
   eig.res = eigen(0.5 * (A + t(A)), symmetric = TRUE);
   ss <- eig.res$values
   ss[ss < 0] <- 0
-  
+
   rbind(eig.res$vectors %*% diag(ss) %*% t(eig.res$vectors), X[(p+1):(p+q),])
 }
 
-#' Compute the proximal operator for one step of the LSCGGM algorithm
-#'
-#' @title Compute proximal operator
 .compute_proximal_operator <- function (X, p, q, rho, tol, maxiter) {
   P <- Q <- X * 0
   for (i in 1:maxiter) {
@@ -67,7 +64,7 @@
     if (diff < tol)
       break()
   }
-  
+
   X
 }
 
@@ -82,19 +79,19 @@ step1_compute_gradient <- function(theta, Sx, Sxy, Sy, N, comp_grad, ps) {
   if (!is.pos.sem.def) {
     return(list(flag=1, obj=Inf, grad=theta))
   }
-  
+
   cyy  = chol(theta$yy);
   logdetyy <- 2 * sum(log(diag(cyy)));
   if((is.nan(logdetyy) | is.infinite(logdetyy))) {
     return(list(flag=1, obj=Inf, grad=theta))
   }
-  
+
   #icyy	 = chol2inv(cyy);
   ithetayy = chol2inv(cyy);
   txyityy  = theta$xy %*% ithetayy;
   XtXth    = Sx %*% txyityy;
   txyXtXth = t(theta$xy) %*% Sx %*% txyityy;
-  
+
   l1 = matrix.trace( theta$yy%*%Sy );
   l2 = matrix.trace( Sxy%*%t(theta$xy) );
   l3 = matrix.trace( txyXtXth );
@@ -102,8 +99,8 @@ step1_compute_gradient <- function(theta, Sx, Sxy, Sy, N, comp_grad, ps) {
   value = value / N;
   A <- rbind(theta$yy, theta$xy)
   value = value + 0.5 * ps$mu * frobenius.norm(A - ps$Shat + ps$Lhat + ps$Uhat/mu)**2
-  
-  
+
+
   if(comp_grad) {
     grad <- list()
     grad$xy <- (Sxy + XtXth)/N + ps$Uhat[(ps$p+1):(ps$p + ps$m),] + mu * (theta$xy - ps$Shat[(ps$p+1):(ps$p + ps$m),] + ps$Lhat[(ps$p+1):(ps$p + ps$m),]);
@@ -116,19 +113,19 @@ step1_compute_gradient <- function(theta, Sx, Sxy, Sy, N, comp_grad, ps) {
   result$obj <- value
   result$grad <- grad
   result$flag <- flag
-  
+
   result
 }
 
 latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
-  
+
   Sx	= t(Z) %*% Z
   Sy 	= t(X) %*% X
   Sxy	= t(Z) %*% X
   N 	= dim(Z)[1]
   p = dim(X)[2]
   m = dim(Z)[2]
-  
+
   nobj	= 10
   bconv	= 0
   obj	= rep(0, maxiter)
@@ -136,7 +133,7 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
   thk_0 	= 2/3
   ls_maxiter = 300
   eta <- 1.5
-  
+
   # Initialise
   theta <- list()
   theta$yy <- A[1:p, ]
@@ -153,11 +150,11 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
     flag <- grad$flag
   }
   obj[1] = obj1;
-  
+
   xk      = theta;
   zk   	= theta;
   thk     = thk_0;
-  
+
   for (iter in 2:maxiter) {
     thk  = (sqrt( thk^4 + 4 * thk^2 ) - thk^2) / 2;
     y <- list()
@@ -173,15 +170,15 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
       zk_grady$xy = zk$xy - 1/(L*thk) * grady$xy;
       zk_grady$yy = zk$yy - 1/(L*thk) * grady$yy;
       zk1 		= zk_grady;
-      
+
       y_grady <- list()
       y_grady$xy	= y$xy - 1/L * grady$xy;
       y_grady$yy	= y$yy - 1/L * grady$yy;
       xk1         = y_grady;
-      
+
       gradxk1 <- step1_compute_gradient(xk1, Sx, Sxy, Sy, N, FALSE, ps)
       fxk1 <- gradxk1$obj
-      
+
       flagxk1 <- gradxk1$flag
       if(is.positive.definite(zk1$yy)) {
         flagzk1 <- 0
@@ -204,9 +201,9 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
           break()
         }
       }
-      
+
       ik = ik + 1;
-      
+
       if ( ik > ls_maxiter ) {
         bconv = 0;
         iter  = max(1, iter - 1);
@@ -219,13 +216,13 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
     if(bconv == 0) {
       break()
     }
-    
+
     if ( iter > nobj + 1) {
       value           = obj[iter];
       prevVals        = obj[iter - nobj];
       avgimprovement  = abs(prevVals - value)/nobj;
       relAvgImpr      = avgimprovement / abs(value)
-      
+
       if ( relAvgImpr < tol ) {
         bconv = 1;
         break()
@@ -240,7 +237,7 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
     termcode <- -1
   }
   list(A=A, objs=obj, iter=length(obj), termcode=termcode)
-  
+
 }
 
 
@@ -255,15 +252,15 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
   ps$m <- opts$q
   ps$p <- opts$p
   ps$mu <- mu
-  
-  out <- latent.scggm.update.A(opts$Z, opts$X, ps, ps$A, tol = opts$tol*0.01, 
+
+  out <- latent.scggm.update.A(opts$Z, opts$X, ps, ps$A, tol = opts$tol*0.01,
                                maxiter = opts$prox_maxiter)
   A <- out$A
   AX <- A[1:opts$p,]
   AX <- 0.5 * (AX + t(AX))
   A[1:opts$p,] <- AX
   ps$A <- A
-  
+
   ps$exit <- FALSE
   ps
 }
@@ -272,7 +269,7 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
   alpha <- ps$alpha[length(ps$alpha)]
   alpha <- 0.5 * (1 + sqrt(1 + 4 * alpha**2))
   ps$alpha <- c(ps$alpha, alpha)
-  
+
   ps
 }
 
@@ -285,14 +282,14 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
   S <- ps$S
   Uhat <- ps$Uhat
   ps$prevL <- ps$L
-  
+
   X1 <- S - A - (Uhat / mu)
-  L <- .compute_proximal_operator(X1, opts$p, opts$q, tol=0.01*opts$tol, rho = lp2, 
+  L <- .compute_proximal_operator(X1, opts$p, opts$q, tol=0.01*opts$tol, rho = lp2,
                                   maxiter = opts$prox_maxiter)
   LX <- L[1:opts$p,]
   LX <- 0.5 * (LX + t(LX))
   L[1:opts$p,] <- LX
-  
+
   ps$L <- L
   ps$exit <- FALSE
   ps
@@ -307,7 +304,7 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
   L <- ps$L
   Uhat <- ps$Uhat
   ps$prevS <- ps$S
-  
+
   X1 <- A + L + (Uhat / mu)
   X2 <- abs(X1) - lp1
   X2[X2 <= 0] <- 0
@@ -328,15 +325,15 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
   pU <- ps$prevU
   alpha_k_min_1 <- ps$alpha[length(ps$alpha)-2]
   alpha_k_plus_1 <- ps$alpha[length(ps$alpha)]
-  
+
   Shat <- S + (alpha_k_min_1 / alpha_k_plus_1) * (S - pS)
   Lhat <- L + (alpha_k_min_1 / alpha_k_plus_1) * (L - pL)
   Uhat <- U + (alpha_k_min_1 / alpha_k_plus_1) * (U - pU)
-  
+
   ps$Shat <- Shat
   ps$Lhat <- Lhat
   ps$Uhat <- Uhat
-  
+
   ps
 }
 
@@ -350,7 +347,7 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
   L <- ps$L
   Uhat <- ps$Uhat
   ps$prevU <- ps$U
-  
+
   U <- Uhat + mu * (A - S + L)
 
   ps$U <- U
@@ -359,7 +356,7 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
 }
 
 .lscggm.update.parameters <- function(ps, opts) {
-  
+
   pL <- ps$L
   pS <- ps$S
   pU <- ps$U
@@ -371,7 +368,7 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
       break()
     }
   }
-  
+
   pck <- ps$ck
   ck <- (1.0 / opts$mu) * sum((ps$Uhat - ps$U)**2) +
     opts$mu * (sum((ps$Shat - ps$Lhat - ps$S + ps$L)**2))
@@ -388,7 +385,7 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
     ps$Lhat <- pL
     ps$alpha <- c(ps$alpha, 1.0)
   }
-  
+
   # One problem with restarting when the value of mu is not
   # good is that it "flip-flops": alternating restart and non-restart
   # endlessly. When that happens 100 times in a row, we reduce the value of mu.
@@ -404,14 +401,13 @@ latent.scggm.update.A <- function(Z, X, ps, A, maxiter=200, tol=1e-7) {
       ps$exit <- TRUE
     }
   }
-  
+
   list(ps=ps, opts=opts)
 }
 
 #######################
-#'
-fit.lscggm <- function(Z, X, Lambda1, Lambda2, 
-                       init=NULL, maxiter=2000, 
+fit.lscggm <- function(Z, X, Lambda1, Lambda2,
+                       init=NULL, maxiter=2000,
                        mu=0.1, tol=1e-05, eta=0.999,
                        prox_maxiter=50,
                        print_progress=TRUE, print_every=20) {
@@ -419,7 +415,7 @@ fit.lscggm <- function(Z, X, Lambda1, Lambda2,
   n <- dim(X)[1]
   p <- dim(X)[2] # Number of variables we model
   q <- dim(Z)[2] # Number of variables we condition on
-    
+
   options <- list()
   options$mu <- mu
   options$X <- scale(X)
@@ -432,7 +428,7 @@ fit.lscggm <- function(Z, X, Lambda1, Lambda2,
   options$q <- q
   options$tol <- tol
   options$prox_maxiter <- prox_maxiter
-  
+
   if (is.null(init)) {
     Sigma <- cor(cbind(X, Z))
     S <- MASS::ginv(Sigma)
@@ -447,7 +443,7 @@ fit.lscggm <- function(Z, X, Lambda1, Lambda2,
   } else {
     parameters <- init
   }
-  
+
   parameters$Shat <- parameters$S
   parameters$Lhat <- parameters$L
   parameters$alpha <- c(1.0, 1.0)
@@ -455,7 +451,7 @@ fit.lscggm <- function(Z, X, Lambda1, Lambda2,
   parameters$Uhat <- parameters$U
   parameters$ck <- p**2
   parameters$exit <- FALSE
-  
+
   diffs <- c()
   lls <- c(NaN)
   parameters$termcode <- -1
@@ -464,14 +460,14 @@ fit.lscggm <- function(Z, X, Lambda1, Lambda2,
     L <- .lscggm.update.parameters(parameters, options)
     new_parameters <- L$ps
     options <- L$opts
-    
+
     if(parameters$exit) {
       parameters$termcode <- -3
-      parameters$termmsg <- 
+      parameters$termmsg <-
         "Algorithm was restarted 100 times without improvement."
       break()
     }
-    
+
     if(any(diag(new_parameters$S) == 0)) {
       parameters$S[,] <- NA
       parameters$termcode <- -2
@@ -480,17 +476,17 @@ fit.lscggm <- function(Z, X, Lambda1, Lambda2,
     }
     # Compute the relative change in parameters with the previous iteration
     if ((matrixcalc::frobenius.norm(parameters$L) > 0)) {
-      diff <- matrixcalc::frobenius.norm(new_parameters$S - parameters$S) / 
+      diff <- matrixcalc::frobenius.norm(new_parameters$S - parameters$S) /
         matrixcalc::frobenius.norm(parameters$S) +
-        matrixcalc::frobenius.norm(new_parameters$L - parameters$L) / 
+        matrixcalc::frobenius.norm(new_parameters$L - parameters$L) /
         matrixcalc::frobenius.norm(parameters$L)
     } else {
-      diff <- matrixcalc::frobenius.norm(new_parameters$S - parameters$S) / 
+      diff <- matrixcalc::frobenius.norm(new_parameters$S - parameters$S) /
         matrixcalc::frobenius.norm(parameters$S) +
         matrixcalc::frobenius.norm(new_parameters$L - parameters$L)
     }
     diffs <- c(diffs, diff)
-    
+
     parameters <- new_parameters
     if (diff < tol) {
       parameters$termcode <- 0
@@ -520,11 +516,11 @@ fit.lscggm <- function(Z, X, Lambda1, Lambda2,
       }
     }
   }
-  
+
   parameters$iter <- i
   parameters$diffs <- diffs
   parameters$lls <- lls
-  
+
   # Clean up the variables that are specific to the algo
   parameters$Shat <- NULL
   parameters$Lhat <- NULL
