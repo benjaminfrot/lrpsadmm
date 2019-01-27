@@ -25,5 +25,5 @@ estimator of the correlation matrix based on Kendall rank correlations. It inclu
 a whole regularisation path and to select tuning parameters with cross-validation.
 
 ## Remarks and Issues
-Feel free to either email at benjamin dot frot @ gmail dot com for questions and bug reporting. 
-You can also open an issue.
+For questions and bug reporting, feel free to either send an email to benjamin dot frot @ gmail dot com or
+open an issue.
