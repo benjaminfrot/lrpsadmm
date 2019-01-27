@@ -2,7 +2,7 @@
 Low-rank plus sparse estimation via Alternating Direction Method of Multipliers (ADMM)
 
 An R package to fit the estimator suggested in Chandrasekaran et al. (https://projecteuclid.org/euclid.aos/1351602527). 
-See manual.pdf for examples and more details.
+See the [manual](https://github.com/benjaminfrot/lrpsadmm/blob/master/manual.pdf) for examples and more details.
 
 ## Installation
 
@@ -23,3 +23,7 @@ covariance matrix which is the sum of a sparse matrix and a low-rank matrix as s
 Chandrasekaran et al (2012) (DOI:10.1214/11-AOS949). The package supports robust estimation via an 
 estimator of the correlation matrix based on Kendall rank correlations. It includes functions to compute 
 a whole regularisation path and to select tuning parameters with cross-validation.
+
+## Remarks and Issues
+Feel free to either email at benjamin dot frot @ gmail dot com for questions and bug reporting. 
+You can also open an issue.
