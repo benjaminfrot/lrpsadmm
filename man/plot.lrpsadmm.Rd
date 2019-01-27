@@ -4,7 +4,10 @@
 \alias{plot.lrpsadmm}
 \title{Plotting function for 'lrpsadmm' Objects}
 \usage{
-\method{plot}{lrpsadmm}(fit)
+\method{plot}{lrpsadmm}(x)
+}
+\arguments{
+\item{x}{An object of class lrpsadmm output by the function \code{lrpsadmm}}
 }
 \description{
 Plots the sparsity pattern of S, the eigenvalues of L and

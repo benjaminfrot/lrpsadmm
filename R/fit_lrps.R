@@ -320,11 +320,13 @@
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
 #' fit.small.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1])
 #' plot(eigen(fit.small.gamma$L)$value) # Spectrum of L
-#' lambda <- 0.28 ; gamma <- 0.7 # A large gamma, favourising a non low-rank component. This is too high for this ratio n/p
+#' lambda <- 0.28 ; gamma <- 0.7 # A large gamma, favourising a non low-rank component.
+#' # This is too high for this ratio n/p
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
 #' fit.large.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1])
 #' plot(eigen(fit.large.gamma$L)$value) # Spectrum of L
-#' # Numerical stability and convergence are not guaranteed for such an ill-posed proble. Gamma is too high.
+#' # Numerical stability and convergence are not guaranteed for such an ill-posed proble.
+#' # Gamma is too high.
 #' plot(fit.large.gamma$lls[350:500], type = 'l', xlab= "#Iterations", ylab = "Log-Likelihood")
 #'
 #' ### Fit the estimator with a robust estimator of the correlation matrix
@@ -338,16 +340,19 @@
 #'
 #' lambda <- 0.7; gamma <- 0.1 # The tuning parameters.
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
-#' fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1], tol=1e-08, print_every = 200) # Outliers make the problem very ill-posed
-#' Kendall.fit <- lrpsadmm(Sigma = Sigma.Kendall, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1], tol=1e-08) # Use the Kendall based estimator
+#' fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2,
+#' n = dim(X)[1], tol=1e-08, print_every = 200) # Outliers make the problem very ill-posed
+#' Kendall.fit <- lrpsadmm(Sigma = Sigma.Kendall, Lambda1 = l1,
+#' Lambda2 = l2, n = dim(X)[1], tol=1e-08) # Use the Kendall based estimator
 #' image(fit$S!=0)
 #' image(Kendall.fit$S!=0)
 #' plot(fit$lls[800:1200], xlab="#Iterations", ylab="Log-Likelihood")
 #' plot(Kendall.fit$lls, xlab="#Iterations", ylab="Log-Likelihood")
 #'
 #' @export
+#' @seealso lrpsadmm.cv lrpsadmm.path
 #' @import matrixcalc RSpectra MASS
-lrpsadmm <- function(Sigma, Lambda1, Lambda2, n=NULL, init=NULL,
+lrpsadmm <- function(Sigma, Lambda1, Lambda2, n=NA, init=NULL,
                                      maxiter=2000, mu=0.1, tol=1e-05, eta=0.999,
                                      print_progress=T, print_every=20,
                                      zeros=NULL) {
@@ -356,7 +361,7 @@ lrpsadmm <- function(Sigma, Lambda1, Lambda2, n=NULL, init=NULL,
     zeros <- 1
   }
   p <- dim(Sigma)[1]
-  if(is.null(n)) {
+  if(is.na(n)) {
     n <- p
   }
   if(is.null(max.rank)) {
@@ -485,6 +490,7 @@ lrpsadmm <- function(Sigma, Lambda1, Lambda2, n=NULL, init=NULL,
 #' @title Plotting function for 'lrpsadmm' Objects
 #' @description Plots the sparsity pattern of S, the eigenvalues of L and
 #' the values taken by the objective function at each iteration.
+#' @param x An object of class lrpsadmm output by the function \code{lrpsadmm}
 #' @examples
 #' set.seed(1)
 #' sim.data <- generate.latent.ggm.data(n=2000, p=100, h=5, outlier.fraction = 0.0,
@@ -497,8 +503,8 @@ lrpsadmm <- function(Sigma, Lambda1, Lambda2, n=NULL, init=NULL,
 #' plot(fit)
 #' @importFrom graphics par plot title
 #' @export
-plot.lrpsadmm <- function(fit) {
-
+plot.lrpsadmm <- function(x) {
+  fit <- x
   par(mfrow=c(2,2))
   image(fit$S!=0)
   title('Non-zero pattern of estimated sparse matrix S')

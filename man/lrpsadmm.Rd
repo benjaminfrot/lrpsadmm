@@ -4,7 +4,7 @@
 \alias{lrpsadmm}
 \title{Fit the the low-rank plus sparse estimator using an accelerated alternating method direction of multipliers}
 \usage{
-lrpsadmm(Sigma, Lambda1, Lambda2, n = NULL, init = NULL,
+lrpsadmm(Sigma, Lambda1, Lambda2, n = NA, init = NULL,
   maxiter = 2000, mu = 0.1, tol = 1e-05, eta = 0.999,
   print_progress = T, print_every = 20, zeros = NULL)
 }
@@ -132,11 +132,13 @@ lambda <- 2; gamma <- 0.1 # Here gamma is fairly small
 l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
 fit.small.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1])
 plot(eigen(fit.small.gamma$L)$value) # Spectrum of L
-lambda <- 0.28 ; gamma <- 0.7 # A large gamma, favourising a non low-rank component. This is too high for this ratio n/p
+lambda <- 0.28 ; gamma <- 0.7 # A large gamma, favourising a non low-rank component.
+# This is too high for this ratio n/p
 l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
 fit.large.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1])
 plot(eigen(fit.large.gamma$L)$value) # Spectrum of L
-# Numerical stability and convergence are not guaranteed for such an ill-posed proble. Gamma is too high.
+# Numerical stability and convergence are not guaranteed for such an ill-posed proble.
+# Gamma is too high.
 plot(fit.large.gamma$lls[350:500], type = 'l', xlab= "#Iterations", ylab = "Log-Likelihood")
 
 ### Fit the estimator with a robust estimator of the correlation matrix
@@ -150,8 +152,10 @@ Sigma.Kendall <- Kendall.correlation.estimator(X) # The robust estimator
 
 lambda <- 0.7; gamma <- 0.1 # The tuning parameters.
 l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
-fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1], tol=1e-08, print_every = 200) # Outliers make the problem very ill-posed
-Kendall.fit <- lrpsadmm(Sigma = Sigma.Kendall, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1], tol=1e-08) # Use the Kendall based estimator
+fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2,
+n = dim(X)[1], tol=1e-08, print_every = 200) # Outliers make the problem very ill-posed
+Kendall.fit <- lrpsadmm(Sigma = Sigma.Kendall, Lambda1 = l1,
+Lambda2 = l2, n = dim(X)[1], tol=1e-08) # Use the Kendall based estimator
 image(fit$S!=0)
 image(Kendall.fit$S!=0)
 plot(fit$lls[800:1200], xlab="#Iterations", ylab="Log-Likelihood")
@@ -169,4 +173,7 @@ SIAM Journal on Imaging Sciences, 2014, Vol. 7, No. 3 : pp. 1588-1623
 Gui-Bo Ye, Yuanfeng Wang, Yifei Chen, Xiaohui Xie;
 Efficient Latent Variable Graphical Model Selection via Split Bregman Method.
 \url{https://arxiv.org/abs/1110.3076}
+}
+\seealso{
+lrpsadmm.cv lrpsadmm.path
 }
