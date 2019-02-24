@@ -35,8 +35,7 @@ relative change in the Frobenius norm of the parameters is below this threshold.
 of #iterations).}
 
 \item{zeros}{A p x p matrix with entries set to 0 or 1. Whereever its entries are
-0, the entries of the estimated S will be forced to 0.
-By default it is min(p-1, n-1), provided a value of n is given.}
+0, the entries of the estimated S will be forced to 0.}
 }
 \value{
 An S3 object of class lrpsadmm. It is essentially a list with keys:
