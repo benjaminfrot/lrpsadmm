@@ -419,7 +419,7 @@ plot.lrpsadmmcv <- function(x) {
     my.path <- x
     par(mfrow = c(2, 2))
     image(x$best.fit$fit$S!=0)
-    title(paste("Support of of selected sparse matrix S.\nLambda=", round(x$best.lambda, 6), "\n Gamma=", x$best.gamma))
+    title(paste("Support of selected sparse matrix S.\nLambda=", round(x$best.lambda, 6), "\n Gamma=", x$best.gamma))
     plot(eigen(x$best.fit$fit$L)$values)
     title("Spectrum of selected\n low-rank matrix L")
     A <- lapply(my.path$cross.validated.paths, .prepare.plot.one.cv.path)

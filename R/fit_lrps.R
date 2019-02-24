@@ -220,7 +220,6 @@
 #' of #iterations).
 #' @param zeros A p x p matrix with entries set to 0 or 1. Whereever its entries are
 #' 0, the entries of the estimated S will be forced to 0.
-#' By default it is min(p-1, n-1), provided a value of n is given.
 #' @details
 ##' Given a n x p data matrix X and its empirical correlation matrix
 #' \eqn{\Sigma}, an alternating direction method of multipliers (ADMM) algorithm
@@ -508,7 +507,7 @@ plot.lrpsadmm <- function(x) {
   par(mfrow=c(2,2))
   image(fit$S!=0)
   title('Non-zero pattern of estimated sparse matrix S')
-  plot(eigen(fit$L)$values)
+  plot(eigen(fit$L)$values, ylab = "EValues of L")
   title('Eigenvalues of estimated L')
   plot(fit$lls, xlab="#Iteration")
   title("Objective Function")
