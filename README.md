@@ -16,6 +16,9 @@ library(devtools)
 install_github("benjaminfrot/lrpsadmm")
 ```
 
+## Tutorials
+See this repository : https://github.com/benjaminfrot/lrpsadmm-examples
+
 ## Description
 Fit the Low-Rank plus Sparse (LRpS) estimator using an accelerated version of the Alternating 
 Direction Method of Multipliers (ADMM) (DOI:10.1137/120896219). This model learns an inverse 
