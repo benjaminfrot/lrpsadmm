@@ -8,7 +8,7 @@ lrpsadmm.cv(X, gammas = c(0.05, 0.1, 0.15), covariance.estimator = cor,
   n.folds = 5, lambdas = NULL, lambda.max = NULL,
   lambda.ratio = 1e-04, n.lambdas = 20, max.sparsity = 0.5,
   max.rank = NA, tol = 1e-05, max.iter = 2000, mu = 0.1,
-  verbose = FALSE, seed = NA)
+  verbose = FALSE, seed = NA, zeros = NULL)
 }
 \arguments{
 \item{X}{n x p data matrix}
@@ -45,6 +45,9 @@ generate according a geometric sequence between lambda.max and lambda.max * lamb
 \item{verbose}{A boolean. Whether to print the value of lambda, gamma, sparsity of S, etc... after each fit}
 
 \item{seed}{Set the seed of the random number generator used for the K folds.}
+
+\item{zeros}{A p x p matrix with entries set to 0 or 1. Whereever its entries are
+0, the entries of the estimated S will be forced to 0.}
 }
 \value{
 An object of class lrpsadmmcv.

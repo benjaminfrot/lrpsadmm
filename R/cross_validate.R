@@ -60,6 +60,9 @@
 #' @param mu \code{mu} parameter of the \code{lrpsadmm} function.
 #' @param verbose A boolean. Whether to print the value of lambda, gamma, sparsity of S, etc... after each fit
 #' @param seed Set the seed of the random number generator used for the K folds.
+#' @param zeros A p x p matrix with entries set to 0 or 1. Whereever its entries are
+#' 0, the entries of the estimated S will be forced to 0.
+#' 
 #' @return
 #'   An object of class lrpsadmmcv.
 #'   It contains the values of the mean cross-validated log-likelihood, its standard deviation for each
@@ -154,7 +157,8 @@ lrpsadmm.cv <- function(X,
                         max.iter = 2000,
                         mu = 0.1,
                         verbose = FALSE,
-                        seed = NA) {
+                        seed = NA,
+                        zeros = NULL) {
   n <- dim(X)[1]
   if (!is.na(seed)) {
     set.seed(seed)
@@ -181,7 +185,8 @@ lrpsadmm.cv <- function(X,
       max.iter,
       mu,
       verbose,
-      seed
+      seed,
+      zeros
     )
     all.paths[[counter]]$gamma <- gamma
     all.paths[[counter]]$best.fit <-
@@ -220,7 +225,8 @@ lrpsadmm.cv <- function(X,
                                max.iter = 2000,
                                mu = 0.1,
                                verbose = FALSE,
-                               seed = NA) {
+                               seed = NA,
+                               zeros=NULL) {
   Sigma <- covariance.estimator(X)
   p <- dim(Sigma)[1]
   n <- dim(X)[1]
@@ -251,7 +257,8 @@ lrpsadmm.cv <- function(X,
       tol = tol,
       max.iter = max.iter,
       mu = mu,
-      verbose = verbose
+      verbose = verbose,
+      zeros=zeros
     )
   if (verbose) {
     print(paste("### Now performing ", n.folds, " fold cross validation. ###"))
@@ -288,7 +295,8 @@ lrpsadmm.cv <- function(X,
         print_progress = F,
         tol = tol,
         maxiter = max.iter,
-        mu = mu
+        mu = mu,
+        zeros=zeros
       )
       if (fitll$termcode == -2) {
         ll <- NaN

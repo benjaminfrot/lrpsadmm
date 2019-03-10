@@ -37,6 +37,9 @@
 #' @param max.iter \code{max.iter} parameter of the \code{lrpsadmm} function.
 #' @param mu \code{mu} parameter of the \code{lrpsadmm} function.
 #' @param verbose A boolean. Whether to print the value of lambda, gamma, sparsity of S and rank of L after each fit.
+#' @param zeros A p x p matrix with entries set to 0 or 1. Whereever its entries are
+#' 0, the entries of the estimated S will be forced to 0.
+#
 #' @return
 #'   An object of class lrpsaddmpath. This is essentially a list (see examples). Each element is itself a list with keys:
 #'   \describe{
@@ -127,6 +130,7 @@ lrpsadmm.path <- function(Sigma,
                           tol = 1e-05,
                           max.iter = 2000,
                           mu = 0.1,
+                          zeros = NULL,
                           verbose = FALSE) {
   p <- dim(Sigma)[1]
 
@@ -155,7 +159,8 @@ lrpsadmm.path <- function(Sigma,
       maxiter = max.iter,
       mu = mu,
       tol = tol,
-      print_progress = FALSE
+      print_progress = FALSE,
+      zeros = zeros
     )
     if (fit$termcode == -2) {
       next()

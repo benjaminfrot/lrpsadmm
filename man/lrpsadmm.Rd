@@ -102,7 +102,8 @@ plot(fit$lls[15:50], type='l') # The log-likelihood from iteration 15 onwards
 lambda <- 0.4; gamma <- 0.1 # Change the tuning parameters
 l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
 # Reuse the previous fit as warm start:
-warm.fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1], init=fit, tol = 1e-09)
+warm.fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1], 
+init=fit, tol = 1e-09)
 warm.fit$iter # Number of itereations of the algorithm
 # Fit without warm start
 cold.fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1], tol=1e-09)

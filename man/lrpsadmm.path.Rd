@@ -7,7 +7,7 @@
 lrpsadmm.path(Sigma, gamma, n = NA, lambdas = NULL,
   lambda.max = NULL, lambda.ratio = 1e-04, n.lambdas = 20,
   max.sparsity = 0.5, max.rank = NA, tol = 1e-05, max.iter = 2000,
-  mu = 0.1, verbose = FALSE)
+  mu = 0.1, zeros = NULL, verbose = FALSE)
 }
 \arguments{
 \item{Sigma}{A p x p matrix. An estimate of the correlation matrix}
@@ -35,6 +35,9 @@ generate according a geometric sequence between lambda.max and lambda.max * lamb
 \item{max.iter}{\code{max.iter} parameter of the \code{lrpsadmm} function.}
 
 \item{mu}{\code{mu} parameter of the \code{lrpsadmm} function.}
+
+\item{zeros}{A p x p matrix with entries set to 0 or 1. Whereever its entries are
+0, the entries of the estimated S will be forced to 0.}
 
 \item{verbose}{A boolean. Whether to print the value of lambda, gamma, sparsity of S and rank of L after each fit.}
 }
