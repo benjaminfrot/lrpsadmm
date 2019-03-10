@@ -2,7 +2,7 @@
 Low-rank plus sparse estimation via Alternating Direction Method of Multipliers (ADMM)
 
 An R package to fit the estimator suggested in Chandrasekaran et al. (https://projecteuclid.org/euclid.aos/1351602527). 
-See the [manual](https://github.com/benjaminfrot/lrpsadmm/blob/master/manual.pdf) for examples and more details.
+See the [manual](https://github.com/benjaminfrot/lrpsadmm/blob/master/manual.pdf) or the [lrpsadmm-examples](https://github.com/benjaminfrot/lrpsadmm-examples) for examples and more details. 
 
 ## Installation
 
@@ -15,6 +15,9 @@ Install the package:
 library(devtools)
 install_github("benjaminfrot/lrpsadmm")
 ```
+
+## Tutorials and Examples
+See the [lrpsadmm-examples](https://github.com/benjaminfrot/lrpsadmm-examples) repository for step by step tutorials on how to use the package. The [manual](https://github.com/benjaminfrot/lrpsadmm/blob/master/manual.pdf) also contains examples.
 
 ## Description
 Fit the Low-Rank plus Sparse (LRpS) estimator using an accelerated version of the Alternating 
