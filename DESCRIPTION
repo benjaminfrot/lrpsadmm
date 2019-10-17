@@ -1,6 +1,6 @@
 Package: lrpsadmm
 Type: Package
-Title: Low-rank plus sparse estimation via Alternating Direction Method of Multipliers (ADMM)
+Title: Low-Rank Plus Sparse Estimation via Alternating Direction Method of Multipliers (ADMM)
 Version: 0.2.0
 Author: Benjamin Frot
 Maintainer: Benjamin Frot <benjamin.frot@gmail.com>
