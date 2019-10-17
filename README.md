@@ -20,8 +20,8 @@ install_github("benjaminfrot/lrpsadmm")
 See the [lrpsadmm-examples](https://github.com/benjaminfrot/lrpsadmm-examples) repository for step by step tutorials on how to use the package. The [manual](https://github.com/benjaminfrot/lrpsadmm/blob/master/manual.pdf) also contains examples.
 
 ## Description
-Fit the Low-Rank plus Sparse (LRpS) estimator using an accelerated version of the Alternating 
-Direction Method of Multipliers (ADMM) (DOI:10.1137/120896219). This model learns an inverse 
+Fit the Low-Rank plus Sparse (LRpS) estimator using the Alternating 
+Direction Method of Multipliers (ADMM). This model learns an inverse 
 covariance matrix which is the sum of a sparse matrix and a low-rank matrix as suggested by 
 Chandrasekaran et al (2012) (DOI:10.1214/11-AOS949). The package supports robust estimation via an 
 estimator of the correlation matrix based on Kendall rank correlations. It includes functions to compute 
