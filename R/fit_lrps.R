@@ -219,7 +219,6 @@ lrpsadmm.cppeigen <- function(Sigma,
   colnames(history) <-
     c('Objval', 's_norm', 'r_norm', 'eps_pri', 'eps_dual')
   history <- as.data.frame(history)
-  history$Iteration <- 1:nrow(history)
   parameters <- list()
   parameters$termcode <- cpp_output$termcode
   if (parameters$termcode == 0) {
