@@ -20,6 +20,6 @@ sim.data <- generate.latent.ggm.data(n=2000, p=100, h=5, outlier.fraction = 0.0,
 X <- sim.data$obs.data; Sigma <- cor(X) # Sample correlation matrix
 lambda <- 0.7; gamma <- 0.1 # The tuning parameters.
 l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
-fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1])
+fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2)
 plot(fit)
 }

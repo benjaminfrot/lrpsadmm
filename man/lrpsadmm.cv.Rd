@@ -7,8 +7,9 @@
 lrpsadmm.cv(X, gammas = c(0.05, 0.1, 0.15), covariance.estimator = cor,
   n.folds = 5, lambdas = NULL, lambda.max = NULL,
   lambda.ratio = 1e-04, n.lambdas = 20, max.sparsity = 0.5,
-  max.rank = NA, tol = 1e-05, max.iter = 2000, mu = 0.1,
-  verbose = FALSE, seed = NA, zeros = NULL)
+  max.rank = NA, abs_tol = 1e-05, rel_tol = 0.001, max.iter = 2000,
+  mu = 1, verbose = FALSE, seed = NA, zeros = NULL,
+  backend = "RcppEigen")
 }
 \arguments{
 \item{X}{n x p data matrix}
@@ -36,7 +37,9 @@ generate according a geometric sequence between lambda.max and lambda.max * lamb
 
 \item{max.rank}{A real between 0 and 1. Abort the computuation of the path if the rank of L becomes higher than this value.}
 
-\item{tol}{\code{tol} parameter of the \code{lrpsadmm} function.}
+\item{abs_tol}{\code{abs_tol} parameter of the \code{lrpsadmm} function.}
+
+\item{rel_tol}{\code{rel_tol} parameter of the \code{lrpsadmm} function.}
 
 \item{max.iter}{\code{max.iter} parameter of the \code{lrpsadmm} function.}
 
@@ -48,6 +51,8 @@ generate according a geometric sequence between lambda.max and lambda.max * lamb
 
 \item{zeros}{A p x p matrix with entries set to 0 or 1. Whereever its entries are
 0, the entries of the estimated S will be forced to 0.}
+
+\item{backend}{The \code{backend} parameter of lrpsadmm. It is one of 'R' or 'RcppEigen'.}
 }
 \value{
 An object of class lrpsadmmcv.
@@ -107,6 +112,7 @@ ground.truth <- sim.data$precision.matrix[1:100, 1:100]
 ground.truth <- 1 * (( ground.truth - diag(diag(ground.truth)) ) !=0)
 X <- sim.data$obs.data;
 gammas <- c(0.1, 0.15, 0.2)
+# Let the function decide the range of value of Lambda
 cvpath <- lrpsadmm.cv(X, gammas = gammas,
                          lambda.ratio = 1e-02, n.lambdas = 30, verbose = TRUE)
 best.gamma <- cvpath$best.gamma

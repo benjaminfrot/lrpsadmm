@@ -1,203 +1,248 @@
 
-.obj_func <- function(ps, opts) {
-  p <- opts$p
-  n <- opts$n
-  C <- opts$Sigma
-  l1 <- opts$lp1 * opts$mu
-  l2 <- opts$lp2 * opts$mu
-  X <- ps$S - ps$L
-  X <- 0.5 * (X + t(X))
-  evals <- eigen(X, symmetric = TRUE)$val
-  evals[abs(evals) < 1e-08] <- 1e-16
+.obj_func.R <- function(Sigma, A, S, L, l1, l2) {
+  evals <- eigen(A, symmetric = TRUE, only.values = TRUE)$values
+  evals[abs(evals) < 1e-09] <- 1e-8
   if (any(evals < 0)) {
     return(NaN)
   }
+  
   # Log-Likelihood
-  ll <- sum(diag(C %*% X)) - sum(log(evals))
+  ll <- sum(diag(Sigma %*% A)) - sum(log(evals))
   # + Penalty
-  ll <- ll + l1 * sum(abs(ps$S)) + l2 * sum(diag(ps$L))
-
+  ll <- ll + l1 * sum(abs(S)) + l2 * sum(diag(L))
+  
   ll
 }
 
-.updateA <- function(ps, opts) {
-  lp1 <- opts$lp1
-  lp2 <- opts$lp2
-  mu <- opts$mu
-  C <- opts$Sigma
-  Shat <- ps$Shat
-  Lhat <- ps$Lhat
-  Uhat <- ps$Uhat
-  n <- opts$n
-  p <- opts$p
-
-  X1 <- mu * (Shat - Lhat) - C - Uhat
+.updateA.R <- function(Sigma, S, L, U, mu) {
+  X1 <- mu * (S - L) - Sigma - U
   X2 <- X1 %*% X1 + 4 * mu * diag(dim(X1)[1])
-  X2 <- 0.5 * (X2 + t(X2))
   eig <- eigen(X2, symmetric = TRUE)
   sqrtX2 <- eig$vectors %*% diag(sqrt(eig$values)) %*% t(eig$vectors)
   A <- (X1 + sqrtX2) / (2 * mu)
-  A <- 0.5 * (A + t(A))
-
-  ps$A <- A
-  ps$exit <- F
-  ps
+  
+  return(A)
 }
 
-.updateAlpha <- function(ps, opts) {
-  alpha <- ps$alpha[length(ps$alpha)]
-  alpha <- 0.5 * (1 + sqrt(1 + 4 * alpha**2))
-  ps$alpha <- c(ps$alpha, alpha)
-
-  ps
-}
-
-.updateL <- function(ps, opts) {
-  lp1 <- opts$lp1
-  lp2 <- opts$lp2
-  mu <- opts$mu
-  C <- opts$Sigma
-  A <- ps$A
-  S <- ps$S
-  Uhat <- ps$Uhat
-  ps$prevL <- ps$L
-
-  X1 <- S - A - (Uhat / mu)
-  X1 <- 0.5 * (X1 + t(X1))
-  eig <- tryCatch({
-    RSpectra::eigs_sym(X1, opts$max.rank)
-  },
-  error = function(e) {
-    print(e)
-    ps$exit <- TRUE
-    return(ps)
-  }
-  )
+.updateL.R <- function(A, S, U, l2, mu) {
+  lp2 <- l2 / mu
+  
+  X1 <- S - A - (U / mu)
+  eig <- eigen(X1)
   eigVal <- eig$values - lp2
   eigVal[eigVal < 0] <- 0
   L <- eig$vectors %*% diag(eigVal) %*% t(eig$vectors)
-  L <- 0.5 * (L + t(L))
-
-  ps$L <- L
-  ps$exit <- F
-  ps
+  
+  return(L)
 }
 
-.updateS <- function(ps, opts) {
-  lp1 <- opts$lp1
-  lp2 <- opts$lp2
-  mu <- opts$mu
-  C <- opts$Sigma
-  A <- ps$A
-  L <- ps$L
-  Uhat <- ps$Uhat
-  ps$prevS <- ps$S
-
-  X1 <- A + L + (Uhat / mu)
+.updateS.R <- function(A, L, U, l1, mu, zeros) {
+  lp1 <- l1 / mu
+  
+  X1 <- A + L + (U / mu)
   X2 <- abs(X1) - lp1
   X2[X2 <= 0] <- 0
   S <- X2 * sign(X1)
-  S <- S * opts$zeros
-  S <- 0.5 * (S + t(S))
-
-  ps$S <- S
-  ps$exit <- FALSE
-  ps
+  S <- S * zeros
+  
+  return(S)
 }
 
-.updateShatLhatUhat <- function(ps, opts) {
-  S <- ps$S
-  pS <- ps$prevS
-  L <- ps$L
-  pL <- ps$prevL
-  U <- ps$U
-  pU <- ps$prevU
-  alpha_k_min_1 <- ps$alpha[length(ps$alpha)-2]
-  alpha_k_plus_1 <- ps$alpha[length(ps$alpha)]
-
-  Shat <- S + (alpha_k_min_1 / alpha_k_plus_1) * (S - pS)
-  Lhat <- L + (alpha_k_min_1 / alpha_k_plus_1) * (L - pL)
-  Uhat <- U + (alpha_k_min_1 / alpha_k_plus_1) * (U - pU)
-
-  ps$Shat <- Shat
-  ps$Lhat <- Lhat
-  ps$Uhat <- Uhat
-
-  ps
-}
-
-.updateU <- function(ps, opts) {
-  lp1 <- opts$lp1
-  lp2 <- opts$lp2
-  mu <- opts$mu
-  C <- opts$Sigma
-  A <- ps$A
-  S <- ps$S
-  L <- ps$L
-  Uhat <- ps$Uhat
-  ps$prevU <- ps$U
-
-  U <- Uhat + mu * (A - S + L)
-  U <- 0.5 * (U + t(U))
-
-  ps$U <- U
-  ps$exit <- FALSE
-  ps
+.updateU.R <- function(A, S, L, U, mu) {
+  
+  U <- U + mu * (A - S + L)
+  
+  return(U)
 }
 
 
-.split.bregman.low.rank.plus.sparse.update.parameters <- function(ps, opts) {
-
-  pL <- ps$L
-  pS <- ps$S
-  pU <- ps$U
-  ps$exit <- FALSE
-  fs <- c(.updateA, .updateS, .updateL, .updateU)
-  for (f in fs) {
-    ps <- f(ps, opts)
-    if(ps$exit) {
+#' @import MASS 
+lrpsadmm.R <- function(Sigma, Lambda1, Lambda2, init,
+                       maxiter, mu, 
+                       abs_tol, rel_tol,
+                       print_progress, print_every,
+                       zeros) {
+  if (is.null(zeros)) {
+    zeros <- 1
+  }
+  
+  p <- dim(Sigma)[1]
+  
+  if (is.null(init)) {
+    S <- diag(p)
+    L <- S * 0.0
+    U <- S * 0.0
+  } else {
+    parameters <- init
+    S <- init$S
+    L <- init$L
+    U <- init$U 
+  }
+  
+  # Enforce the 0 pattern
+  S <- S * zeros
+  
+  history <- matrix(NA, nrow=0, ncol=6)
+  colnames(history) <- c('Iteration', 'Objval', 's_norm', 'r_norm', 'eps_pri', 'eps_dual')
+  parameters <- list()
+  parameters$termcode <- -1
+  parameters$termmsg <- "Maximum number of iterations reached."
+  for (i in 1:maxiter) {
+    
+    # Update A
+    A <- .updateA.R(Sigma, S, L, U, mu)
+    
+    # Update S
+    S_old <- S
+    S <- .updateS.R(A, L, U, Lambda1, mu, zeros)
+    if(any(diag(S) == 0)) {
+      S <- diag(p)
+      L <- S * 0
+      U <- S * 0
+      parameters$termcode <- -2
+      parameters$termmsg <- "Shrinkage too strong: sparse component is empty."
       break()
     }
-  }
-
-  pck <- ps$ck
-  ck <- (1.0 / opts$mu) * sum((ps$Uhat - ps$U)**2) +
-    opts$mu * (sum((ps$Shat - ps$Lhat - ps$S + ps$L)**2))
-  if (ck < (opts$eta * pck)) { # Do not restart
-    ps$restarts <- c(ps$restarts, 0)
-    ps$ck <- ck
-    ps <- .updateAlpha(ps, opts)
-    ps <- .updateShatLhatUhat(ps, opts)
-  } else { # Then we restart
-    ps$restarts <- c(ps$restarts, 1)
-    ps$ck <- pck / (opts$eta)
-    ps$Shat <- pS
-    ps$Uhat <- pU
-    ps$Lhat <- pL
-    ps$alpha <- c(ps$alpha, 1.0)
-  }
-
-  # One problem with restarting when the value of mu is not
-  # good is that it "flip-flops": alternating restart and non-restart
-  # endlessly. When that happens 100 times in a row, we reduce the value of mu.
-  if ((length(ps$restarts) > 200)) {
-    if (all(ps$restarts[(length(ps$restarts)-99):length(ps$restarts)] ==
-            rep(c(0,1), 50))) {
-      # then we know it flip-flops.
-      msg1 <- "The accelerated ADMM algorithm restarted 100 times in a row."
-      msg2 <- "It seems like the required convergence tolerance cannot be achieved."
-      msg3 <- "The problem might be too ill-posed. For example, the value of gamma might be too large given the ratio p/n."
-      msg4 <- "You can also consider rying a smaller value of mu.\n"
-      warning(paste(msg1, msg2, msg3, msg4))
-      ps$exit <- TRUE
+    
+    # Update L
+    L_old <- L
+    L <- .updateL.R(A, S, U, Lambda2, mu)
+    
+    # Update U
+    U <- .updateU.R(A, S, L, U, mu)
+    
+    # Diagnostics
+    objval <- .obj_func.R(Sigma, A, S, L, Lambda1, Lambda2)
+    
+    r_norm <- norm(A - (S-L), 'F')
+    s_norm <- norm(mu * ((S-L) - (S_old - L_old)), 'F')
+    eps_pri <- p * abs_tol + rel_tol * 
+      max(norm(A, 'F'), norm(S-L, 'F'))
+    eps_dual <- p * abs_tol + rel_tol * norm(mu * U, 'F') 
+    history <- rbind(history, c(i, objval, s_norm, 
+                                r_norm, eps_pri, eps_dual))
+    
+    if( (s_norm < eps_dual) && (r_norm < eps_pri) ) {
+      parameters$termcode <- 0
+      parameters$termmsg <- 'Convergence Reached.'
+      break()
     }
+    if ((print_progress) & (i > print_every)) {
+      if((i %% print_every) == 0) {
+        print(paste(c("Iteration:", "Obj. fun.:", "s_norm:", 
+                      "r_norm:", "eps_pri:", "eps_dual:"), 
+                    history[i,]))
+      }
+    }
+    
   }
-
-  list(ps=ps, opts=opts)
+  
+  parameters$S <- S
+  parameters$L <- L
+  parameters$U <- U
+  parameters$history <- as.data.frame(history)
+  
+  attr(parameters, "class") <- "lrpsadmm"
+  
+  parameters
 }
 
+#' @useDynLib lrpsadmm
+#' @importFrom Rcpp evalCpp
+#' @import MASS RcppEigen
+lrpsadmm.cppeigen <- function(Sigma,
+                              Lambda1,
+                              Lambda2,
+                              init,
+                              maxiter,
+                              mu,
+                              abs_tol,
+                              rel_tol,
+                              print_progress,
+                              print_every,
+                              zeros) {
+  
+  if (print_progress == FALSE) {
+    print_every = -1
+  }
+  
+  p <- dim(Sigma)[1]
+  has_zeros <- 1
+  if (is.null(zeros)) {
+    has_zeros <- -1
+    zeros <- matrix(1, ncol = 1, nrow = 1)
+  }
+  
+  if (is.null(init)) {
+    S <- diag(p)
+    L <- S * 0.0
+    U <- S * 0.0
+  } else {
+    parameters <- init
+    S <- init$S
+    L <- init$L
+    U <- init$U
+  }
+  
+  # Enforce the 0 pattern
+  if (has_zeros > 0) {
+    S <- S * zeros
+  }
+  A <- matrix(NA, ncol = p, nrow = p)
+  cpp_output <-
+    .Call(
+      '_lrpsadmm_rcppeigen_fit_lrps',
+      PACKAGE = 'lrpsadmm',
+      Sigma,
+      A,
+      S,
+      L,
+      U,
+      zeros,#Zeros
+      Lambda1, #L1
+      Lambda2, #L2
+      mu, # Mu
+      maxiter, # Maxiter
+      rel_tol, # rel tol
+      abs_tol, # abs tol,
+      print_every,
+      has_zeros
+    )
+  
+  history <- cbind(
+    cpp_output$objvals,
+    cpp_output$snorms,
+    cpp_output$rnorms,
+    cpp_output$epspris,
+    cpp_output$epsduals
+  )
+  colnames(history) <-
+    c('Objval', 's_norm', 'r_norm', 'eps_pri', 'eps_dual')
+  history <- as.data.frame(history)
+  history$Iteration <- 1:nrow(history)
+  parameters <- list()
+  parameters$termcode <- cpp_output$termcode
+  if (parameters$termcode == 0) {
+    parameters$termmsg <- "Convergence Reached."
+  } else if (parameters$termcode == -1) {
+    parameters$termmsg <- "Maximum number of iterations reached."
+  } else if (parameters$termcode == -2) {
+    parameters$termmsg <-
+      "Shrinkage too strong: sparse component is empty."
+  }
+  
+  parameters$S <- cpp_output$S
+  parameters$L <- cpp_output$L
+  parameters$U <- cpp_output$U
+  parameters$history <- history
+  attr(parameters, "class") <- "lrpsadmm"
+  
+  return(parameters)
+}
+
+
 #'
-#' Fit the the low-rank plus sparse estimator using an accelerated alternating method direction of multipliers
+#' Fit the the low-rank plus sparse estimator using the alternating method direction of multipliers
 #' @description
 #' Given a n x p data matrix X and its empirical correlation matrix
 #' \eqn{\Sigma}, an alternating direction method of multipliers (ADMM) algorithm
@@ -207,19 +252,21 @@
 #' @param Sigma An estimate of the correlation matrix.
 #' @param Lambda1 Penalty on the l1 norm of S
 #' @param Lambda2 Penalty on the sum of the eigenvalues of L
-#' @param n Number of samples. Giving its value is useful when n < p.
 #' @param init The output of a previous run of the algorithm. For warm starts.
 #' @param maxiter Maximal number of iterations
 #' @param mu Stepsize of the ADMM algorithm.
-#' @param tol Relative tolerance required to stop the algorithm. Algorithm is stopped
-#' when either the relative change in log-likelihood is below this threshold, or the
-#' relative change in the Frobenius norm of the parameters is below this threshold.
-#' @param eta Restart parameter in the accelerated ADMM.
+#' @param rel_tol Relative tolerance required to stop the algorithm. The algorithm
+#' stops when both the change in parameters is below tolerance and the constraints
+#' are satisfied. Default 1e-02.
+#' @param abs_tol Absolute tolerance required to stop the algorithm. Default 1e-04.
 #' @param print_progress Whether the algorithm should report on its progress.
 #' @param print_every How often should the algorithm report on its progress (in terms
 #' of #iterations).
 #' @param zeros A p x p matrix with entries set to 0 or 1. Whereever its entries are
 #' 0, the entries of the estimated S will be forced to 0.
+#' @param backend A character vector. It should be either 'RcppEigen' or 'R'. 
+#' If 'R' then use the pure R implementation, if 'RcppEigen' then use the C++
+#' implementation.
 #' @details
 ##' Given a n x p data matrix X and its empirical correlation matrix
 #' \eqn{\Sigma}, an alternating direction method of multipliers (ADMM) algorithm
@@ -230,8 +277,6 @@
 #'
 #' The optimisation problem is decomposed as a three-block ADMM optimisation problem, as described in Ye et al.
 #' Because it is a so-called consensus problem, the ADMM is guaranteed to converge.
-#' Given this decomposition of the problem, we use the "Fast ADMM with Restart" (Alg. 8) of Goldstein et al.
-#' in order to fit the problem (see references).
 #'
 #' The tuning parameters \eqn{\lambda_1} and \eqn{\lambda_2} are typically reparametrised as
 #' \eqn{\lambda_1 = \lambda \gamma} and \eqn{\lambda_2 = \lambda (1 - \gamma)}, for \eqn{\gamma \in (0,1)}.
@@ -246,23 +291,17 @@
 #'  \item{S}{A p x p matrix. The sparse estimate S}
 #'  \item{L}{A p x p matrix. The low-rank estimate L}
 #'  \item{termcode}{An integer. Its value determines whether the algorithm terminated normally or with an error.
-#'  0: Convergence reached. -1: Maxiter reached. -2: Shrinkage too strong. -3: Too many restarts in a row.}
+#'  0: Convergence reached. -1: Maxiter reached. -2: Shrinkage too strong.}
 #'  \item{termmsg}{A character vector. The message corresponding to the value \code{termcode}.}
-#'  \item{iter}{An integer. Number of iterations until convergence.}
-#'  \item{diffs}{A vector. Relative difference in change of parameters (in Frobenius norm) at each iteration.}
-#'  \item{lls}{A vector. Values taken by the objective function at each iteration.}
-#'  \item{A}{A p x p matrix. A variable used by the algorithm. Its value should be close to S - L.
-#'  It is stored and returned by the algorithm in order to allow warm starts.}
+#'  \item{history}{A numerical dataframe with the objective function at each 
+#'  iterations, the norm and dual norm as well the primal and dual tolerance 
+#'  criteria for convergence. The algorithm exits when r_norm < eps_pri and s_norm < eps_dual.}
 #'  \item{U}{A p x p matrix. Augmented Lagrangian multiplier. It is stored in order to allow warm starts.}
 #' }
 #'
 #' @references
 #' Chandrasekaran, Venkat; Parrilo, Pablo A.; Willsky, Alan S. Latent variable graphical model selection via convex optimization.
 #' Ann. Statist. 40 (2012), no. 4, 1935--1967. doi:10.1214/11-AOS949. \url{https://projecteuclid.org/euclid.aos/1351602527}
-#'
-#' Tom Goldstein, Brendan O'Donoghue, Simon Setzer, and Richard Baraniuk;
-#' Fast Alternating Direction Optimization Methods.
-#' SIAM Journal on Imaging Sciences, 2014, Vol. 7, No. 3 : pp. 1588-1623
 #'
 #' Gui-Bo Ye, Yuanfeng Wang, Yifei Chen, Xiaohui Xie;
 #' Efficient Latent Variable Graphical Model Selection via Split Bregman Method.
@@ -274,61 +313,63 @@
 #' sim.data <- generate.latent.ggm.data(n=2000, p=100, h=5, outlier.fraction = 0.0,
 #'                                      sparsity = 0.02, sparsity.latent = 0.7)
 #' X <- sim.data$obs.data; Sigma <- cor(X) # Sample correlation matrix
-#'
+#' 
 #' ### Fit the estimator for some value of the tuning parameters
 #' lambda <- 0.7; gamma <- 0.1 # The tuning parameters.
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
-#' fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1])
+#' fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, 
+#'                 abs_tol=1e-06, rel_tol=1e-04)
 #' plot(fit) # Use the S3 method plot
 #' estS <- fit$S # Sparse estimate
 #' image(estS!=0) # Visualise its non-zero pattern
 #' estL <- fit$L # Low-rank estimate
 #' plot(eigen(estL)$values) # Visualise the spectrum of the low-rank estimate
-#' plot(fit$lls[15:50], type='l') # The log-likelihood from iteration 15 onwards
-#'
+#' plot(fit$history$Objval, type='l') # The log-likelihood from iteration 15 onwards
+#' 
 #' ### Fit for another value of the tuning parameters and compare cold/warm starts
 #' lambda <- 0.4; gamma <- 0.1 # Change the tuning parameters
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
 #' # Reuse the previous fit as warm start:
-#' warm.fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1], 
-#' init=fit, tol = 1e-09)
-#' warm.fit$iter # Number of itereations of the algorithm
+#' warm.fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2,
+#'                      init=fit, rel_tol = 1e-04, abs_tol=1e-06)
 #' # Fit without warm start
-#' cold.fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1], tol=1e-09)
-#' cold.fit$iter # Number of iterations
-#' plot(cold.fit$lls[10:50], type='l', col='red', ylab = "Log-Likelihood", xlab = "#Iteration")
-#' lines(warm.fit$lls[10:50], col='blue')
-#' legend(20, 103, c("Cold Start", "Warm Start"), col=c("red", "blue"), lty=c(1,1))
-#'
+#' cold.fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, rel_tol=1e-04,
+#'                      abs_tol=1e-06)
+#' plot(cold.fit$history$Objval, type='l', col='red', ylab = "Log-Likelihood", xlab = "#Iteration")
+#' lines(warm.fit$history$Objval, col='blue')
+#' xleg = 0.5 * nrow(cold.fit$history)
+#' yleg = 0.5 * (max(cold.fit$history$Objval) + min(cold.fit$history$Objval))
+#' legend(x = xleg, y=yleg, legend=c("Cold Start", "Warm Start"), col=c("red", "blue"), lty=c(1,1))
+#' 
 #' ### Force the sparsity pattern of the sparse component
 #' zeros = 1 * (sim.data$precision.matrix != 0) # A mtrix of 0 and 1.
 #' zeros = zeros[1:100,1:100] # Keep only the observed part
 #' # Whereever zeros[i,j] = 0, the estimated S will be 0.
-#' fit.zeros <- lrpsadmm(Sigma, l1, l2, n=dim(X)[1], tol=1e-09, zeros = zeros)
-#' fit.no.zeros <- lrpsadmm(Sigma, l1, l2, n=dim(X)[1], tol=1e-09)
+#' fit.zeros <- lrpsadmm(Sigma, l1, l2, abs_tol=1e-06, rel_tol=1e-04, zeros = zeros)
+#' fit.no.zeros <- lrpsadmm(Sigma, l1, l2, abs_tol=1e-06, rel_tol=1e-04)
 #' image(fit.zeros$S!=0) # Comparing the sparsity patterns
 #' image(fit.no.zeros$S!=0)
-#'
+#' 
 #' ### Fit the estimator when the problem is not so well-posed (n close to p)
 #' set.seed(0)
 #' # n = 80, p = 100 with 5 latent variables.
 #' sim.data <- generate.latent.ggm.data(n=80, p=100, h=5, outlier.fraction = 0.0,
 #'                                      sparsity = 0.02, sparsity.latent = 0.7)
 #' X <- sim.data$obs.data; Sigma <- cor(X) # Sample correlation matrix
-#'
+#' 
 #' lambda <- 2; gamma <- 0.1 # Here gamma is fairly small
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
-#' fit.small.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1])
+#' fit.small.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2)
 #' plot(eigen(fit.small.gamma$L)$value) # Spectrum of L
-#' lambda <- 0.28 ; gamma <- 0.7 # A large gamma, favourising a non low-rank component.
+# lambda <- 0.28 ; gamma <- 0.7 # A large gamma, favourising a non low-rank component.
 #' # This is too high for this ratio n/p
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
-#' fit.large.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1])
+#' fit.large.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2)
 #' plot(eigen(fit.large.gamma$L)$value) # Spectrum of L
 #' # Numerical stability and convergence are not guaranteed for such an ill-posed proble.
 #' # Gamma is too high.
-#' plot(fit.large.gamma$lls[350:500], type = 'l', xlab= "#Iterations", ylab = "Log-Likelihood")
-#'
+#' plot(fit.large.gamma$history$Objval, type = 'l', xlab= "#Iterations", ylab = "Log-Likelihood")
+#' 
 #' ### Fit the estimator with a robust estimator of the correlation matrix
 #' # Generate data with 5% of outliers
 #' set.seed(0)
@@ -337,154 +378,52 @@
 #' X <- sim.data$obs.data;
 #' Sigma <- cor(X) # Sample correlation matrix
 #' Sigma.Kendall <- Kendall.correlation.estimator(X) # The robust estimator
-#'
+#' 
 #' lambda <- 0.7; gamma <- 0.1 # The tuning parameters.
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
+#' # Outliers make the problem very ill-posed
 #' fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2,
-#' n = dim(X)[1], tol=1e-08, print_every = 200) # Outliers make the problem very ill-posed
+#'                 abs_tol=1e-06, rel_tol=1e-04, print_every = 200) 
+#' # Use the Kendall based estimator
 #' Kendall.fit <- lrpsadmm(Sigma = Sigma.Kendall, Lambda1 = l1,
-#' Lambda2 = l2, n = dim(X)[1], tol=1e-08) # Use the Kendall based estimator
+#'                         Lambda2 = l2, abs_tol=1e-06, rel_tol=1e-04) 
 #' image(fit$S!=0)
 #' image(Kendall.fit$S!=0)
-#' plot(fit$lls[800:1200], xlab="#Iterations", ylab="Log-Likelihood")
-#' plot(Kendall.fit$lls, xlab="#Iterations", ylab="Log-Likelihood")
-#'
+#' plot(fit$history$Objval, xlab="#Iterations", ylab="Log-Likelihood")
+#' plot(Kendall.fit$history$Objval, xlab="#Iterations", ylab="Log-Likelihood")
 #' @export
 #' @seealso lrpsadmm.cv lrpsadmm.path
-#' @import matrixcalc RSpectra MASS
-lrpsadmm <- function(Sigma, Lambda1, Lambda2, n=NA, init=NULL,
-                                     maxiter=2000, mu=0.1, tol=1e-05, eta=0.999,
-                                     print_progress=T, print_every=20,
-                                     zeros=NULL) {
-  max.rank <- NULL
-  if (is.null(zeros)) {
-    zeros <- 1
+#' @import MASS
+lrpsadmm <- function(Sigma,
+                     Lambda1,
+                     Lambda2,
+                     init = NULL,
+                     maxiter = 1000,
+                     mu = 1.0,
+                     abs_tol = 1e-04,
+                     rel_tol = 1e-02,
+                     print_progress = TRUE,
+                     print_every = 10,
+                     zeros = NULL,
+                     backend='RcppEigen') {
+  
+  if (backend == 'R') {
+    res <- lrpsadmm.R(Sigma, Lambda1, Lambda2, init, 
+                      maxiter, mu, abs_tol, rel_tol, 
+                      print_progress, print_every, zeros)
   }
-  p <- dim(Sigma)[1]
-  if(is.na(n)) {
-    n <- p
+  else if(backend == 'RcppEigen') {
+    res <- lrpsadmm.cppeigen(Sigma, Lambda1, Lambda2, 
+                             init, maxiter, mu, 
+                             abs_tol, rel_tol, 
+                             print_progress, 
+                             print_every, zeros)
+    
   }
-  if(is.null(max.rank)) {
-    max.rank <- ceiling(min(n-1, p-1))
+  else {
+    print("Error. 'backend' argument must be either 'R' or 'RcppEigen'.")
+    return(NULL)
   }
-
-  options <- list()
-  options$mu <- mu
-  options$Sigma <- Sigma
-  options$lp1 <- Lambda1 / mu
-  options$lp2 <- Lambda2 / mu
-  options$eta <- eta
-  options$zeros <- zeros
-  options$max.rank <- max.rank
-  options$n <- n
-  options$p <- p
-
-  if (is.null(init)) {
-    S <- MASS::ginv(Sigma)
-    L <- S * 0.01
-    A <- S - L #+ diag(rep(1, p))
-    U <- mu * (A - S + L)
-    parameters <- list(S=S, L=L, A=A, U=U)
-  } else {
-    parameters <- init
-  }
-
-  parameters$Shat <- parameters$S
-  parameters$Lhat <- parameters$L
-  parameters$alpha <- c(1.0, 1.0)
-  parameters$restarts <- c()
-  parameters$Uhat <- parameters$U
-  parameters$ck <- p**2
-  parameters$exit <- FALSE
-  parameters$S <- parameters$S * options$zeros
-
-  diffs <- c()
-  lls <- c(NaN)
-  parameters$termcode <- -1
-  parameters$termmsg <- "Maximum number of iterations reached."
-  for (i in 1:maxiter) {
-    L <- .split.bregman.low.rank.plus.sparse.update.parameters(parameters, options)
-    new_parameters <- L$ps
-    options <- L$opts
-
-    if(parameters$exit) {
-      parameters$termcode <- -3
-      parameters$termmsg <-
-        "Algorithm was restarted 100 times without improvement."
-      break()
-    }
-
-    if(any(diag(new_parameters$S) == 0)) {
-      parameters$S <- diag(p)
-      parameters$termcode <- -2
-      parameters$termmsg <- "Shrinkage too strong: sparse component is empty."
-      break()
-    }
-    # Compute the relative change in parameters with the previous iteration
-    if ((matrixcalc::frobenius.norm(parameters$L) > 0)) {
-      diff <- matrixcalc::frobenius.norm(new_parameters$S - parameters$S) /
-        matrixcalc::frobenius.norm(parameters$S) +
-        matrixcalc::frobenius.norm(new_parameters$L - parameters$L) /
-        matrixcalc::frobenius.norm(parameters$L)
-    } else {
-      diff <- matrixcalc::frobenius.norm(new_parameters$S - parameters$S) /
-        matrixcalc::frobenius.norm(parameters$S) +
-        matrixcalc::frobenius.norm(new_parameters$L - parameters$L)
-    }
-    diffs <- c(diffs, diff)
-
-    parameters <- new_parameters
-    if (diff < tol) {
-      parameters$termcode <- 0
-      parameters$termmsg <- "Convergence reached."
-      break()
-    }
-    # Compute the objective function and its relative change
-    lls <- c(lls, .obj_func(parameters, options))
-    if (!is.nan(lls[length(lls)]) & !is.nan(lls[length(lls)-1])) {
-      ll_m_1 <- lls[length(lls)-1]
-      ll <- lls[length(lls)]
-      if ((abs(ll - ll_m_1) / abs(ll_m_1)) < tol) {
-        parameters$termcode <- 0
-        parameters$termmsg <- "Convergence reached."
-        break()
-      }
-    } else {
-      ll <- NaN
-    }
-    if ((print_progress) & (i > print_every)) {
-      if((i %% print_every) == 0) {
-        last_lls <- lls[(i-print_every):i]
-        avg_chg <- mean(abs(diff(last_lls)) / abs(last_lls[1:(print_every)]),
-                        na.rm=T)
-        print(paste("Iteration:", i,
-                    "Log-Likelihood:", ll,
-                    "Avg relative log-likelihood change:", avg_chg,
-                    "Relative change in parameters:", diff))
-      }
-    }
-  }
-
-  parameters$iter <-i
-  parameters$diffs <- diffs
-  parameters$lls <- lls
-
-  # Clean up the variables that are specific to the algo
-  parameters$Shat <- NULL
-  parameters$Lhat <- NULL
-  parameters$alpha <- NULL
-  parameters$restarts <- NULL
-  parameters$Uhat <- NULL
-  parameters$ck <- NULL
-  parameters$exit <- NULL
-  parameters$prevS <- NULL
-  parameters$prevL <- NULL
-  parameters$prevU <- NULL
-  parameters$exit <- NULL
-
-  attr(parameters, "class") <- "lrpsadmm"
-
-  parameters
 }
 
 #' @title Plotting function for 'lrpsadmm' Objects
@@ -499,18 +438,18 @@ lrpsadmm <- function(Sigma, Lambda1, Lambda2, n=NA, init=NULL,
 
 #' lambda <- 0.7; gamma <- 0.1 # The tuning parameters.
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
-#' fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1])
+#' fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2)
 #' plot(fit)
 #' @importFrom graphics par plot title
 #' @export
 plot.lrpsadmm <- function(x) {
   fit <- x
-  par(mfrow=c(2,2))
-  image(fit$S!=0)
+  par(mfrow = c(2, 2))
+  image(fit$S != 0)
   title('Non-zero pattern of estimated sparse matrix S')
   plot(eigen(fit$L)$values, ylab = "EValues of L")
   title('Eigenvalues of estimated L')
-  plot(fit$lls, xlab="#Iteration")
+  plot(fit$history$Objval, xlab = "#Iteration")
   title("Objective Function")
-  par(mfrow=c(1,1))
+  par(mfrow = c(1, 1))
 }

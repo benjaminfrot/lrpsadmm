@@ -2,11 +2,11 @@
 % Please edit documentation in R/fit_lrps.R
 \name{lrpsadmm}
 \alias{lrpsadmm}
-\title{Fit the the low-rank plus sparse estimator using an accelerated alternating method direction of multipliers}
+\title{Fit the the low-rank plus sparse estimator using the alternating method direction of multipliers}
 \usage{
-lrpsadmm(Sigma, Lambda1, Lambda2, n = NA, init = NULL,
-  maxiter = 2000, mu = 0.1, tol = 1e-05, eta = 0.999,
-  print_progress = T, print_every = 20, zeros = NULL)
+lrpsadmm(Sigma, Lambda1, Lambda2, init = NULL, maxiter = 1000,
+  mu = 1, abs_tol = 1e-04, rel_tol = 0.01, print_progress = TRUE,
+  print_every = 10, zeros = NULL, backend = "RcppEigen")
 }
 \arguments{
 \item{Sigma}{An estimate of the correlation matrix.}
@@ -15,19 +15,17 @@ lrpsadmm(Sigma, Lambda1, Lambda2, n = NA, init = NULL,
 
 \item{Lambda2}{Penalty on the sum of the eigenvalues of L}
 
-\item{n}{Number of samples. Giving its value is useful when n < p.}
-
 \item{init}{The output of a previous run of the algorithm. For warm starts.}
 
 \item{maxiter}{Maximal number of iterations}
 
 \item{mu}{Stepsize of the ADMM algorithm.}
 
-\item{tol}{Relative tolerance required to stop the algorithm. Algorithm is stopped
-when either the relative change in log-likelihood is below this threshold, or the
-relative change in the Frobenius norm of the parameters is below this threshold.}
+\item{abs_tol}{Absolute tolerance required to stop the algorithm. Default 1e-04.}
 
-\item{eta}{Restart parameter in the accelerated ADMM.}
+\item{rel_tol}{Relative tolerance required to stop the algorithm. The algorithm
+stops when both the change in parameters is below tolerance and the constraints
+are satisfied. Default 1e-02.}
 
 \item{print_progress}{Whether the algorithm should report on its progress.}
 
@@ -36,6 +34,10 @@ of #iterations).}
 
 \item{zeros}{A p x p matrix with entries set to 0 or 1. Whereever its entries are
 0, the entries of the estimated S will be forced to 0.}
+
+\item{backend}{A character vector. It should be either 'RcppEigen' or 'R'. 
+If 'R' then use the pure R implementation, if 'RcppEigen' then use the C++
+implementation.}
 }
 \value{
 An S3 object of class lrpsadmm. It is essentially a list with keys:
@@ -43,13 +45,11 @@ An S3 object of class lrpsadmm. It is essentially a list with keys:
  \item{S}{A p x p matrix. The sparse estimate S}
  \item{L}{A p x p matrix. The low-rank estimate L}
  \item{termcode}{An integer. Its value determines whether the algorithm terminated normally or with an error.
- 0: Convergence reached. -1: Maxiter reached. -2: Shrinkage too strong. -3: Too many restarts in a row.}
+ 0: Convergence reached. -1: Maxiter reached. -2: Shrinkage too strong.}
  \item{termmsg}{A character vector. The message corresponding to the value \code{termcode}.}
- \item{iter}{An integer. Number of iterations until convergence.}
- \item{diffs}{A vector. Relative difference in change of parameters (in Frobenius norm) at each iteration.}
- \item{lls}{A vector. Values taken by the objective function at each iteration.}
- \item{A}{A p x p matrix. A variable used by the algorithm. Its value should be close to S - L.
- It is stored and returned by the algorithm in order to allow warm starts.}
+ \item{history}{A numerical dataframe with the objective function at each 
+ iterations, the norm and dual norm as well the primal and dual tolerance 
+ criteria for convergence. The algorithm exits when r_norm < eps_pri and s_norm < eps_dual.}
  \item{U}{A p x p matrix. Augmented Lagrangian multiplier. It is stored in order to allow warm starts.}
 }
 }
@@ -70,8 +70,6 @@ This is the estimator suggested in Chandrasekaran et al.
 
 The optimisation problem is decomposed as a three-block ADMM optimisation problem, as described in Ye et al.
 Because it is a so-called consensus problem, the ADMM is guaranteed to converge.
-Given this decomposition of the problem, we use the "Fast ADMM with Restart" (Alg. 8) of Goldstein et al.
-in order to fit the problem (see references).
 
 The tuning parameters \eqn{\lambda_1} and \eqn{\lambda_2} are typically reparametrised as
 \eqn{\lambda_1 = \lambda \gamma} and \eqn{\lambda_2 = \lambda (1 - \gamma)}, for \eqn{\gamma \in (0,1)}.
@@ -90,34 +88,36 @@ X <- sim.data$obs.data; Sigma <- cor(X) # Sample correlation matrix
 ### Fit the estimator for some value of the tuning parameters
 lambda <- 0.7; gamma <- 0.1 # The tuning parameters.
 l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
-fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1])
+fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, 
+                abs_tol=1e-06, rel_tol=1e-04)
 plot(fit) # Use the S3 method plot
 estS <- fit$S # Sparse estimate
 image(estS!=0) # Visualise its non-zero pattern
 estL <- fit$L # Low-rank estimate
 plot(eigen(estL)$values) # Visualise the spectrum of the low-rank estimate
-plot(fit$lls[15:50], type='l') # The log-likelihood from iteration 15 onwards
+plot(fit$history$Objval, type='l') # The log-likelihood from iteration 15 onwards
 
 ### Fit for another value of the tuning parameters and compare cold/warm starts
 lambda <- 0.4; gamma <- 0.1 # Change the tuning parameters
 l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
 # Reuse the previous fit as warm start:
-warm.fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1], 
-init=fit, tol = 1e-09)
-warm.fit$iter # Number of itereations of the algorithm
+warm.fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2,
+                     init=fit, rel_tol = 1e-04, abs_tol=1e-06)
 # Fit without warm start
-cold.fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1], tol=1e-09)
-cold.fit$iter # Number of iterations
-plot(cold.fit$lls[10:50], type='l', col='red', ylab = "Log-Likelihood", xlab = "#Iteration")
-lines(warm.fit$lls[10:50], col='blue')
-legend(20, 103, c("Cold Start", "Warm Start"), col=c("red", "blue"), lty=c(1,1))
+cold.fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, rel_tol=1e-04,
+                     abs_tol=1e-06)
+plot(cold.fit$history$Objval, type='l', col='red', ylab = "Log-Likelihood", xlab = "#Iteration")
+lines(warm.fit$history$Objval, col='blue')
+xleg = 0.5 * nrow(cold.fit$history)
+yleg = 0.5 * (max(cold.fit$history$Objval) + min(cold.fit$history$Objval))
+legend(x = xleg, y=yleg, legend=c("Cold Start", "Warm Start"), col=c("red", "blue"), lty=c(1,1))
 
 ### Force the sparsity pattern of the sparse component
 zeros = 1 * (sim.data$precision.matrix != 0) # A mtrix of 0 and 1.
 zeros = zeros[1:100,1:100] # Keep only the observed part
 # Whereever zeros[i,j] = 0, the estimated S will be 0.
-fit.zeros <- lrpsadmm(Sigma, l1, l2, n=dim(X)[1], tol=1e-09, zeros = zeros)
-fit.no.zeros <- lrpsadmm(Sigma, l1, l2, n=dim(X)[1], tol=1e-09)
+fit.zeros <- lrpsadmm(Sigma, l1, l2, abs_tol=1e-06, rel_tol=1e-04, zeros = zeros)
+fit.no.zeros <- lrpsadmm(Sigma, l1, l2, abs_tol=1e-06, rel_tol=1e-04)
 image(fit.zeros$S!=0) # Comparing the sparsity patterns
 image(fit.no.zeros$S!=0)
 
@@ -130,16 +130,15 @@ X <- sim.data$obs.data; Sigma <- cor(X) # Sample correlation matrix
 
 lambda <- 2; gamma <- 0.1 # Here gamma is fairly small
 l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
-fit.small.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1])
+fit.small.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2)
 plot(eigen(fit.small.gamma$L)$value) # Spectrum of L
-lambda <- 0.28 ; gamma <- 0.7 # A large gamma, favourising a non low-rank component.
 # This is too high for this ratio n/p
 l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
-fit.large.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, n = dim(X)[1])
+fit.large.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2)
 plot(eigen(fit.large.gamma$L)$value) # Spectrum of L
 # Numerical stability and convergence are not guaranteed for such an ill-posed proble.
 # Gamma is too high.
-plot(fit.large.gamma$lls[350:500], type = 'l', xlab= "#Iterations", ylab = "Log-Likelihood")
+plot(fit.large.gamma$history$Objval, type = 'l', xlab= "#Iterations", ylab = "Log-Likelihood")
 
 ### Fit the estimator with a robust estimator of the correlation matrix
 # Generate data with 5\% of outliers
@@ -152,23 +151,20 @@ Sigma.Kendall <- Kendall.correlation.estimator(X) # The robust estimator
 
 lambda <- 0.7; gamma <- 0.1 # The tuning parameters.
 l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
+# Outliers make the problem very ill-posed
 fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2,
-n = dim(X)[1], tol=1e-08, print_every = 200) # Outliers make the problem very ill-posed
+                abs_tol=1e-06, rel_tol=1e-04, print_every = 200) 
+# Use the Kendall based estimator
 Kendall.fit <- lrpsadmm(Sigma = Sigma.Kendall, Lambda1 = l1,
-Lambda2 = l2, n = dim(X)[1], tol=1e-08) # Use the Kendall based estimator
+                        Lambda2 = l2, abs_tol=1e-06, rel_tol=1e-04) 
 image(fit$S!=0)
 image(Kendall.fit$S!=0)
-plot(fit$lls[800:1200], xlab="#Iterations", ylab="Log-Likelihood")
-plot(Kendall.fit$lls, xlab="#Iterations", ylab="Log-Likelihood")
-
+plot(fit$history$Objval, xlab="#Iterations", ylab="Log-Likelihood")
+plot(Kendall.fit$history$Objval, xlab="#Iterations", ylab="Log-Likelihood")
 }
 \references{
 Chandrasekaran, Venkat; Parrilo, Pablo A.; Willsky, Alan S. Latent variable graphical model selection via convex optimization.
 Ann. Statist. 40 (2012), no. 4, 1935--1967. doi:10.1214/11-AOS949. \url{https://projecteuclid.org/euclid.aos/1351602527}
-
-Tom Goldstein, Brendan O'Donoghue, Simon Setzer, and Richard Baraniuk;
-Fast Alternating Direction Optimization Methods.
-SIAM Journal on Imaging Sciences, 2014, Vol. 7, No. 3 : pp. 1588-1623
 
 Gui-Bo Ye, Yuanfeng Wang, Yifei Chen, Xiaohui Xie;
 Efficient Latent Variable Graphical Model Selection via Split Bregman Method.

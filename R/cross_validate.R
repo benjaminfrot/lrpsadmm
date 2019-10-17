@@ -55,13 +55,15 @@
 #' generate according a geometric sequence between lambda.max and lambda.max * lambda.ratio. See Details.
 #' @param max.sparsity A real between 0 and 1. Abort the computation of the path if S becomes denser than this value.
 #' @param max.rank A real between 0 and 1. Abort the computuation of the path if the rank of L becomes higher than this value.
-#' @param tol \code{tol} parameter of the \code{lrpsadmm} function.
+#' @param rel_tol \code{rel_tol} parameter of the \code{lrpsadmm} function.
+#' @param abs_tol \code{abs_tol} parameter of the \code{lrpsadmm} function.
 #' @param max.iter \code{max.iter} parameter of the \code{lrpsadmm} function.
 #' @param mu \code{mu} parameter of the \code{lrpsadmm} function.
 #' @param verbose A boolean. Whether to print the value of lambda, gamma, sparsity of S, etc... after each fit
 #' @param seed Set the seed of the random number generator used for the K folds.
 #' @param zeros A p x p matrix with entries set to 0 or 1. Whereever its entries are
 #' 0, the entries of the estimated S will be forced to 0.
+#' @param backend The \code{backend} parameter of lrpsadmm. It is one of 'R' or 'RcppEigen'. 
 #' 
 #' @return
 #'   An object of class lrpsadmmcv.
@@ -78,7 +80,7 @@
 #' ground.truth <- 1 * (( ground.truth - diag(diag(ground.truth)) ) !=0)
 #' X <- sim.data$obs.data;
 #' gammas <- c(0.1, 0.15, 0.2)
-# Let the function decide the range of value of Lambda
+#' # Let the function decide the range of value of Lambda
 #' cvpath <- lrpsadmm.cv(X, gammas = gammas,
 #'                          lambda.ratio = 1e-02, n.lambdas = 30, verbose = TRUE)
 #' best.gamma <- cvpath$best.gamma
@@ -153,12 +155,14 @@ lrpsadmm.cv <- function(X,
                         n.lambdas = 20,
                         max.sparsity = 0.5,
                         max.rank = NA,
-                        tol = 1e-05,
+                        abs_tol = 1e-05,
+                        rel_tol = 1e-03,
                         max.iter = 2000,
-                        mu = 0.1,
+                        mu = 1.0,
                         verbose = FALSE,
                         seed = NA,
-                        zeros = NULL) {
+                        zeros = NULL,
+                        backend='RcppEigen') {
   n <- dim(X)[1]
   if (!is.na(seed)) {
     set.seed(seed)
@@ -181,12 +185,14 @@ lrpsadmm.cv <- function(X,
       n.lambdas,
       max.sparsity,
       max.rank,
-      tol,
+      rel_tol,
+      abs_tol,
       max.iter,
       mu,
       verbose,
       seed,
-      zeros
+      zeros,
+      backend
     )
     all.paths[[counter]]$gamma <- gamma
     all.paths[[counter]]$best.fit <-
@@ -215,18 +221,20 @@ lrpsadmm.cv <- function(X,
                                gamma,
                                folds,
                                covariance.estimator = cor,
-                               lambdas = NULL,
-                               lambda.max = NULL,
-                               lambda.ratio = 1e-4,
-                               n.lambdas = 20,
-                               max.sparsity = 0.5,
-                               max.rank = NA,
-                               tol = 1e-05,
-                               max.iter = 2000,
-                               mu = 0.1,
-                               verbose = FALSE,
-                               seed = NA,
-                               zeros=NULL) {
+                               lambdas,
+                               lambda.max,
+                               lambda.ratio,
+                               n.lambdas,
+                               max.sparsity,
+                               max.rank,
+                               rel_tol,
+                               abs_tol,
+                               max.iter,
+                               mu,
+                               verbose,
+                               seed,
+                               zeros,
+                               backend) {
   Sigma <- covariance.estimator(X)
   p <- dim(Sigma)[1]
   n <- dim(X)[1]
@@ -250,15 +258,16 @@ lrpsadmm.cv <- function(X,
     lrpsadmm.path(
       Sigma,
       gamma,
-      n,
       lambdas = lambdas,
       max.sparsity = max.sparsity,
       max.rank = max.rank,
-      tol = tol,
+      rel_tol = rel_tol,
+      abs_tol = abs_tol,
       max.iter = max.iter,
       mu = mu,
       verbose = verbose,
-      zeros=zeros
+      zeros=zeros,
+      backend=backend
     )
   if (verbose) {
     print(paste("### Now performing ", n.folds, " fold cross validation. ###"))
@@ -290,13 +299,14 @@ lrpsadmm.cv <- function(X,
         Strain,
         l1,
         l2,
-        nrow(X[folds$which != k,]),
         init = fit,
         print_progress = F,
-        tol = tol,
+        rel_tol = rel_tol,
+        abs_tol = abs_tol,
         maxiter = max.iter,
         mu = mu,
-        zeros=zeros
+        zeros=zeros,
+        backend=backend
       )
       if (fitll$termcode == -2) {
         ll <- NaN
@@ -428,7 +438,7 @@ plot.lrpsadmmcv <- function(x) {
     par(mfrow = c(2, 2))
     image(x$best.fit$fit$S!=0)
     title(paste("Support of selected sparse matrix S.\nLambda=", round(x$best.lambda, 6), "\n Gamma=", x$best.gamma))
-    plot(eigen(x$best.fit$fit$L)$values)
+    plot(eigen(x$best.fit$fit$L)$values, ylab='Eigenvalue')
     title("Spectrum of selected\n low-rank matrix L")
     A <- lapply(my.path$cross.validated.paths, .prepare.plot.one.cv.path)
     gammas <- unlist(lapply(my.path$cross.validated.paths, function(x){x$gamma}))
@@ -449,7 +459,7 @@ plot.lrpsadmmcv <- function(x) {
       lines(A[[i]]$lambdas, A[[i]]$lls - A[[i]]$sds, type='l', lty=3, col=colours[i])
     }
     abline(v=-log10(my.path$best.lambda), lwd='3')
-    y <- (0.75 * ymax + 0.25 * ymin) / 2
+    y <- (ymax + ymin) / 2
     bidx <- which(gammas == my.path$best.gamma)
     gammas <- as.character(gammas)
     gammas[bidx] <- paste(gammas[bidx],"*", sep='')

@@ -25,7 +25,6 @@
 #' @param Sigma A p x p matrix. An estimate of the correlation matrix
 #' @param gamma A real between 0 and 1. The value of the tuning parameter gamma in the
 #' parametrisation of the penalty described avove. This is the trade-off between the sparse and trace penalties.
-#' @param n An integer. Number of samples from which Sigma has been computed. Useful when n < p.
 #' @param lambdas A decreasing sequence of values of lambda. See Details for the default value.
 #' @param lambda.max A positive real. Maximum value of lambda. See Details.
 #' @param lambda.ratio A real between 0 and 1. The smallest value of lambda is given by lambda.max * lambda.ratio. See Details.
@@ -33,12 +32,14 @@
 #' generate according a geometric sequence between lambda.max and lambda.max * lambda.ratio. See Details.
 #' @param max.sparsity A real between 0 and 1. Abort the computation of the path if S becomes denser than this value.
 #' @param max.rank A real between 0 and 1. Abort the computuation of the path if the rank of L becomes higher than this value.
-#' @param tol \code{tol} parameter of the \code{lrpsadmm} function.
+#' @param rel_tol \code{rel_tol} parameter of the \code{lrpsadmm} function.
+#' @param abs_tol \code{rel_tol} parameter of the \code{lrpsadmm} function.
 #' @param max.iter \code{max.iter} parameter of the \code{lrpsadmm} function.
 #' @param mu \code{mu} parameter of the \code{lrpsadmm} function.
 #' @param verbose A boolean. Whether to print the value of lambda, gamma, sparsity of S and rank of L after each fit.
 #' @param zeros A p x p matrix with entries set to 0 or 1. Whereever its entries are
 #' 0, the entries of the estimated S will be forced to 0.
+#' @param backend The \code{backend} parameter of lrpsadmm. It is one of 'R' or 'RcppEigen'. 
 #
 #' @return
 #'   An object of class lrpsaddmpath. This is essentially a list (see examples). Each element is itself a list with keys:
@@ -58,25 +59,28 @@
 #'      See the documentation of the function \code{lrpsadmm} for more information.}
 #'   }
 #' @examples
+#' 
 #' set.seed(0)
 #' # Generate data with a well-powered dataset
 #' sim.data <- generate.latent.ggm.data(n=2000, p=100, h=5, outlier.fraction = 0.0,
 #'                                      sparsity = 0.02, sparsity.latent = 0.7)
 #' X <- sim.data$obs.data; Sigma <- cor(X) # Sample correlation matrix
-#'
-#'
+#' 
+#' 
 #' gamma <- 0.1 # Some reasonble value for gamma
 #' # We ask for 30 lambdas, but the sparse graph becomes too dense so the
 #' # computation is stopped.
 #' my.path <- lrpsadmm.path(Sigma = Sigma, gamma = gamma,
-#'                          lambda.ratio = 1e-03, n.lambdas = 30, verbose = TRUE)
-#'
+#'                          lambda.ratio = 1e-03, n.lambdas = 30,
+#'                          verbose = TRUE, rel_tol = 1e-04, abs_tol=1e-06)
+#' 
 #' # This time let us ask for 30 values,
 #' # but let us narrow down the range by using a
 #' # a smaller ratio
 #' my.path <- lrpsadmm.path(Sigma = Sigma, gamma = gamma,
-#'                          lambda.max = 0.96, lambda.ratio = 0.1, n.lambdas = 30, verbose = TRUE)
-#'
+#'                          lambda.max = 0.96, lambda.ratio = 0.1, n.lambdas = 30, 
+#'                          verbose = TRUE, rel_tol = 1e-04, abs_tol=1e-06)
+#' 
 #' # Plot some basic information about the path
 #' plot(my.path)
 #' # Look at the first graph in the path
@@ -89,7 +93,7 @@
 #' ground.truth <- 1 * (( ground.truth - diag(diag(ground.truth)) ) !=0)
 #' # There is a new plot with the precision / recall curve
 #' plot(my.path, ground.truth = ground.truth)
-#'
+#' 
 #' ### Let us use a robust estimator of the correlation matrix
 #' # Generate data with 5% of outliers
 #' set.seed(0)
@@ -101,37 +105,39 @@
 #' X <- sim.data$obs.data;
 #' Sigma <- cor(X) # Sample correlation matrix
 #' Sigma.Kendall <- Kendall.correlation.estimator(X) # The robust estimator
-#'
+#' 
 #' # With that many strong outliers, using the sample corr. mat.
-#' # is not well-suited to the problem
+#' # is not going to work well
 #' gamma <- 0.2
 #' my.path <- lrpsadmm.path(Sigma = Sigma, gamma = gamma,
 #'                          lambda.ratio = 1e-02, n.lambdas = 30, verbose = TRUE)
 #' # Use another estimator for the correlation matrix:
 #' my.robust.path <- lrpsadmm.path(Sigma = Sigma.Kendall, gamma = gamma,
-#'                          lambda.ratio = 1e-01, n.lambdas = 30, verbose = TRUE)
+#'                                 lambda.ratio = 1e-01, n.lambdas = 30, verbose = TRUE)
 #' # The output of the sample correlation path is poor (in terms of prec/recall)
 #' # This is pretty much noise
 #' plot(my.path, ground.truth)
 #' # The Kendall estimator produces far better results.
 #' # It is not affected by the 5% of outliers
 #' plot(my.robust.path, ground.truth)
+#'
 #' @import Matrix
 #' @export
 lrpsadmm.path <- function(Sigma,
                           gamma,
-                          n = NA,
                           lambdas = NULL,
                           lambda.max = NULL,
                           lambda.ratio = 1e-4,
                           n.lambdas = 20,
                           max.sparsity = 0.5,
                           max.rank = NA,
-                          tol = 1e-05,
+                          rel_tol = 1e-02,
+                          abs_tol = 1e-04,
                           max.iter = 2000,
-                          mu = 0.1,
+                          mu = 1.0,
                           zeros = NULL,
-                          verbose = FALSE) {
+                          verbose = FALSE,
+                          backend='RcppEigen') {
   p <- dim(Sigma)[1]
 
   if (is.null(lambdas)) {
@@ -154,13 +160,14 @@ lrpsadmm.path <- function(Sigma,
       Sigma,
       l1,
       l2,
-      n,
       init = fit,
       maxiter = max.iter,
       mu = mu,
-      tol = tol,
+      rel_tol = rel_tol,
+      abs_tol = abs_tol,
       print_progress = FALSE,
-      zeros = zeros
+      zeros = zeros,
+      backend=backend
     )
     if (fit$termcode == -2) {
       next()

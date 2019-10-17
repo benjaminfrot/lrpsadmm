@@ -4,18 +4,16 @@
 \alias{lrpsadmm.path}
 \title{Compute the LRpS estimator along a path (for a fixed value of \eqn{gamma})}
 \usage{
-lrpsadmm.path(Sigma, gamma, n = NA, lambdas = NULL,
-  lambda.max = NULL, lambda.ratio = 1e-04, n.lambdas = 20,
-  max.sparsity = 0.5, max.rank = NA, tol = 1e-05, max.iter = 2000,
-  mu = 0.1, zeros = NULL, verbose = FALSE)
+lrpsadmm.path(Sigma, gamma, lambdas = NULL, lambda.max = NULL,
+  lambda.ratio = 1e-04, n.lambdas = 20, max.sparsity = 0.5,
+  max.rank = NA, rel_tol = 0.01, abs_tol = 1e-04, max.iter = 2000,
+  mu = 1, zeros = NULL, verbose = FALSE, backend = "RcppEigen")
 }
 \arguments{
 \item{Sigma}{A p x p matrix. An estimate of the correlation matrix}
 
 \item{gamma}{A real between 0 and 1. The value of the tuning parameter gamma in the
 parametrisation of the penalty described avove. This is the trade-off between the sparse and trace penalties.}
-
-\item{n}{An integer. Number of samples from which Sigma has been computed. Useful when n < p.}
 
 \item{lambdas}{A decreasing sequence of values of lambda. See Details for the default value.}
 
@@ -30,7 +28,9 @@ generate according a geometric sequence between lambda.max and lambda.max * lamb
 
 \item{max.rank}{A real between 0 and 1. Abort the computuation of the path if the rank of L becomes higher than this value.}
 
-\item{tol}{\code{tol} parameter of the \code{lrpsadmm} function.}
+\item{rel_tol}{\code{rel_tol} parameter of the \code{lrpsadmm} function.}
+
+\item{abs_tol}{\code{rel_tol} parameter of the \code{lrpsadmm} function.}
 
 \item{max.iter}{\code{max.iter} parameter of the \code{lrpsadmm} function.}
 
@@ -40,6 +40,8 @@ generate according a geometric sequence between lambda.max and lambda.max * lamb
 0, the entries of the estimated S will be forced to 0.}
 
 \item{verbose}{A boolean. Whether to print the value of lambda, gamma, sparsity of S and rank of L after each fit.}
+
+\item{backend}{The \code{backend} parameter of lrpsadmm. It is one of 'R' or 'RcppEigen'.}
 }
 \value{
 An object of class lrpsaddmpath. This is essentially a list (see examples). Each element is itself a list with keys:
@@ -84,6 +86,7 @@ or if the rank of the low-rank estimate L becomes too high, the computation of t
 when the sparsity of S reaches \code{max.sparsity} or when the rank of L reaches \code{max.rank}.
 }
 \examples{
+
 set.seed(0)
 # Generate data with a well-powered dataset
 sim.data <- generate.latent.ggm.data(n=2000, p=100, h=5, outlier.fraction = 0.0,
@@ -95,13 +98,15 @@ gamma <- 0.1 # Some reasonble value for gamma
 # We ask for 30 lambdas, but the sparse graph becomes too dense so the
 # computation is stopped.
 my.path <- lrpsadmm.path(Sigma = Sigma, gamma = gamma,
-                         lambda.ratio = 1e-03, n.lambdas = 30, verbose = TRUE)
+                         lambda.ratio = 1e-03, n.lambdas = 30,
+                         verbose = TRUE, rel_tol = 1e-04, abs_tol=1e-06)
 
 # This time let us ask for 30 values,
 # but let us narrow down the range by using a
 # a smaller ratio
 my.path <- lrpsadmm.path(Sigma = Sigma, gamma = gamma,
-                         lambda.max = 0.96, lambda.ratio = 0.1, n.lambdas = 30, verbose = TRUE)
+                         lambda.max = 0.96, lambda.ratio = 0.1, n.lambdas = 30, 
+                         verbose = TRUE, rel_tol = 1e-04, abs_tol=1e-06)
 
 # Plot some basic information about the path
 plot(my.path)
@@ -129,17 +134,18 @@ Sigma <- cor(X) # Sample correlation matrix
 Sigma.Kendall <- Kendall.correlation.estimator(X) # The robust estimator
 
 # With that many strong outliers, using the sample corr. mat.
-# is not well-suited to the problem
+# is not going to work well
 gamma <- 0.2
 my.path <- lrpsadmm.path(Sigma = Sigma, gamma = gamma,
                          lambda.ratio = 1e-02, n.lambdas = 30, verbose = TRUE)
 # Use another estimator for the correlation matrix:
 my.robust.path <- lrpsadmm.path(Sigma = Sigma.Kendall, gamma = gamma,
-                         lambda.ratio = 1e-01, n.lambdas = 30, verbose = TRUE)
+                                lambda.ratio = 1e-01, n.lambdas = 30, verbose = TRUE)
 # The output of the sample correlation path is poor (in terms of prec/recall)
 # This is pretty much noise
 plot(my.path, ground.truth)
 # The Kendall estimator produces far better results.
 # It is not affected by the 5\% of outliers
 plot(my.robust.path, ground.truth)
+
 }
