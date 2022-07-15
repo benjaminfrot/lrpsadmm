@@ -4,10 +4,23 @@
 \alias{lrpsadmm.path}
 \title{Compute the LRpS estimator along a path (for a fixed value of \eqn{gamma})}
 \usage{
-lrpsadmm.path(Sigma, gamma, lambdas = NULL, lambda.max = NULL,
-  lambda.ratio = 1e-04, n.lambdas = 20, max.sparsity = 0.5,
-  max.rank = NA, rel_tol = 0.01, abs_tol = 1e-04, max.iter = 2000,
-  mu = 1, zeros = NULL, verbose = FALSE, backend = "RcppEigen")
+lrpsadmm.path(
+  Sigma,
+  gamma,
+  lambdas = NULL,
+  lambda.max = NULL,
+  lambda.ratio = 1e-04,
+  n.lambdas = 20,
+  max.sparsity = 0.5,
+  max.rank = NA,
+  rel_tol = 0.01,
+  abs_tol = 1e-04,
+  max.iter = 2000,
+  mu = 1,
+  zeros = NULL,
+  verbose = FALSE,
+  backend = "RcppEigen"
+)
 }
 \arguments{
 \item{Sigma}{A p x p matrix. An estimate of the correlation matrix}

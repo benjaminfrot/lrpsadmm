@@ -4,8 +4,14 @@
 \alias{generate.latent.ggm.data}
 \title{Simulate data from a Gaussian graphical model with hidden variables}
 \usage{
-generate.latent.ggm.data(n, p, h, sparsity = 0.02,
-  sparsity.latent = 0.7, outlier.fraction = 0)
+generate.latent.ggm.data(
+  n,
+  p,
+  h,
+  sparsity = 0.02,
+  sparsity.latent = 0.7,
+  outlier.fraction = 0
+)
 }
 \arguments{
 \item{n}{Number of samples.}

@@ -4,12 +4,26 @@
 \alias{lrpsadmm.cv}
 \title{Perform K-fold cross-validation for the Low-Rank plus Sparse estimator}
 \usage{
-lrpsadmm.cv(X, gammas = c(0.05, 0.1, 0.15), covariance.estimator = cor,
-  n.folds = 5, lambdas = NULL, lambda.max = NULL,
-  lambda.ratio = 1e-04, n.lambdas = 20, max.sparsity = 0.5,
-  max.rank = NA, abs_tol = 1e-05, rel_tol = 0.001, max.iter = 2000,
-  mu = 1, verbose = FALSE, seed = NA, zeros = NULL,
-  backend = "RcppEigen")
+lrpsadmm.cv(
+  X,
+  gammas = c(0.05, 0.1, 0.15),
+  covariance.estimator = cor,
+  n.folds = 5,
+  lambdas = NULL,
+  lambda.max = NULL,
+  lambda.ratio = 1e-04,
+  n.lambdas = 20,
+  max.sparsity = 0.5,
+  max.rank = NA,
+  abs_tol = 1e-05,
+  rel_tol = 0.001,
+  max.iter = 2000,
+  mu = 1,
+  verbose = FALSE,
+  seed = NA,
+  zeros = NULL,
+  backend = "RcppEigen"
+)
 }
 \arguments{
 \item{X}{n x p data matrix}

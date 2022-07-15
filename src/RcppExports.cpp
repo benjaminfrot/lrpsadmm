@@ -6,6 +6,11 @@
 
 using namespace Rcpp;
 
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // rcppeigen_fit_lrps
 const Rcpp::GenericVector rcppeigen_fit_lrps(const Eigen::MatrixXd& Sigma, Eigen::MatrixXd& A, Eigen::MatrixXd& S, Eigen::MatrixXd& L, Eigen::MatrixXd& U, const Eigen::MatrixXd& Zeros, const double l1, const double l2, const double mu, const int max_iter, const double rel_tol, const double abs_tol, const int print_every, const int has_zeros);
 RcppExport SEXP _lrpsadmm_rcppeigen_fit_lrps(SEXP SigmaSEXP, SEXP ASEXP, SEXP SSEXP, SEXP LSEXP, SEXP USEXP, SEXP ZerosSEXP, SEXP l1SEXP, SEXP l2SEXP, SEXP muSEXP, SEXP max_iterSEXP, SEXP rel_tolSEXP, SEXP abs_tolSEXP, SEXP print_everySEXP, SEXP has_zerosSEXP) {

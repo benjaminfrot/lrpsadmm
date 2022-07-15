@@ -17,10 +17,10 @@
 #' X <- sim.data$obs.data;
 #' Sigma.Kendall <- Kendall.correlation.estimator(X)
 
-#' @import pcaPP Matrix
+#' @import Matrix
 #' @export
 Kendall.correlation.estimator <- function(X) {
-  C <- pcaPP::cor.fk(X)
+  C <- cor(X, method='kendall')
 
   # Make sure it is a correlation matrix
   as.matrix(Matrix::nearPD(sin(0.5 * pi * C), corr = T)$mat)

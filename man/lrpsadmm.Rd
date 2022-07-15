@@ -4,9 +4,20 @@
 \alias{lrpsadmm}
 \title{Fit the the low-rank plus sparse estimator using the alternating method direction of multipliers}
 \usage{
-lrpsadmm(Sigma, Lambda1, Lambda2, init = NULL, maxiter = 1000,
-  mu = 1, abs_tol = 1e-04, rel_tol = 0.01, print_progress = TRUE,
-  print_every = 10, zeros = NULL, backend = "RcppEigen")
+lrpsadmm(
+  Sigma,
+  Lambda1,
+  Lambda2,
+  init = NULL,
+  maxiter = 1000,
+  mu = 1,
+  abs_tol = 1e-04,
+  rel_tol = 0.01,
+  print_progress = TRUE,
+  print_every = 10,
+  zeros = NULL,
+  backend = "RcppEigen"
+)
 }
 \arguments{
 \item{Sigma}{An estimate of the correlation matrix.}
