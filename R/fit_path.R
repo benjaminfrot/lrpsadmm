@@ -39,7 +39,6 @@
 #' @param verbose A boolean. Whether to print the value of lambda, gamma, sparsity of S and rank of L after each fit.
 #' @param zeros A p x p matrix with entries set to 0 or 1. Whereever its entries are
 #' 0, the entries of the estimated S will be forced to 0.
-#' @param backend The \code{backend} parameter of lrpsadmm. It is one of 'R' or 'RcppEigen'. 
 #
 #' @return
 #'   An object of class lrpsaddmpath. This is essentially a list (see examples). Each element is itself a list with keys:
@@ -136,8 +135,7 @@ lrpsadmm.path <- function(Sigma,
                           max.iter = 2000,
                           mu = 1.0,
                           zeros = NULL,
-                          verbose = FALSE,
-                          backend='RcppEigen') {
+                          verbose = FALSE) {
   p <- dim(Sigma)[1]
 
   if (is.null(lambdas)) {
@@ -166,8 +164,7 @@ lrpsadmm.path <- function(Sigma,
       rel_tol = rel_tol,
       abs_tol = abs_tol,
       print_progress = FALSE,
-      zeros = zeros,
-      backend=backend
+      zeros = zeros
     )
     if (fit$termcode == -2) {
       next()

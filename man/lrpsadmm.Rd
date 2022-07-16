@@ -15,8 +15,7 @@ lrpsadmm(
   rel_tol = 0.01,
   print_progress = TRUE,
   print_every = 10,
-  zeros = NULL,
-  backend = "RcppEigen"
+  zeros = NULL
 )
 }
 \arguments{
@@ -45,10 +44,6 @@ of #iterations).}
 
 \item{zeros}{A p x p matrix with entries set to 0 or 1. Whereever its entries are
 0, the entries of the estimated S will be forced to 0.}
-
-\item{backend}{A character vector. It should be either 'RcppEigen' or 'R'. 
-If 'R' then use the pure R implementation, if 'RcppEigen' then use the C++
-implementation.}
 }
 \value{
 An S3 object of class lrpsadmm. It is essentially a list with keys:
@@ -58,8 +53,8 @@ An S3 object of class lrpsadmm. It is essentially a list with keys:
  \item{termcode}{An integer. Its value determines whether the algorithm terminated normally or with an error.
  0: Convergence reached. -1: Maxiter reached. -2: Shrinkage too strong.}
  \item{termmsg}{A character vector. The message corresponding to the value \code{termcode}.}
- \item{history}{A numerical dataframe with the objective function at each 
- iterations, the norm and dual norm as well the primal and dual tolerance 
+ \item{history}{A numerical dataframe with the objective function at each
+ iterations, the norm and dual norm as well the primal and dual tolerance
  criteria for convergence. The algorithm exits when r_norm < eps_pri and s_norm < eps_dual.}
  \item{U}{A p x p matrix. Augmented Lagrangian multiplier. It is stored in order to allow warm starts.}
 }
@@ -99,7 +94,7 @@ X <- sim.data$obs.data; Sigma <- cor(X) # Sample correlation matrix
 ### Fit the estimator for some value of the tuning parameters
 lambda <- 0.7; gamma <- 0.1 # The tuning parameters.
 l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
-fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, 
+fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2,
                 abs_tol=1e-06, rel_tol=1e-04)
 plot(fit) # Use the S3 method plot
 estS <- fit$S # Sparse estimate
@@ -164,10 +159,10 @@ lambda <- 0.7; gamma <- 0.1 # The tuning parameters.
 l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
 # Outliers make the problem very ill-posed
 fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2,
-                abs_tol=1e-06, rel_tol=1e-04, print_every = 200) 
+                abs_tol=1e-06, rel_tol=1e-04, print_every = 200)
 # Use the Kendall based estimator
 Kendall.fit <- lrpsadmm(Sigma = Sigma.Kendall, Lambda1 = l1,
-                        Lambda2 = l2, abs_tol=1e-06, rel_tol=1e-04) 
+                        Lambda2 = l2, abs_tol=1e-06, rel_tol=1e-04)
 image(fit$S!=0)
 image(Kendall.fit$S!=0)
 plot(fit$history$Objval, xlab="#Iterations", ylab="Log-Likelihood")

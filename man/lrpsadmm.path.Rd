@@ -18,8 +18,7 @@ lrpsadmm.path(
   max.iter = 2000,
   mu = 1,
   zeros = NULL,
-  verbose = FALSE,
-  backend = "RcppEigen"
+  verbose = FALSE
 )
 }
 \arguments{
@@ -53,8 +52,6 @@ generate according a geometric sequence between lambda.max and lambda.max * lamb
 0, the entries of the estimated S will be forced to 0.}
 
 \item{verbose}{A boolean. Whether to print the value of lambda, gamma, sparsity of S and rank of L after each fit.}
-
-\item{backend}{The \code{backend} parameter of lrpsadmm. It is one of 'R' or 'RcppEigen'.}
 }
 \value{
 An object of class lrpsaddmpath. This is essentially a list (see examples). Each element is itself a list with keys:

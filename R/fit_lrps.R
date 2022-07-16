@@ -1,4 +1,5 @@
 
+
 .obj_func.R <- function(Sigma, A, S, L, l1, l2) {
   evals <- eigen(A, symmetric = TRUE, only.values = TRUE)$values
   evals[abs(evals) < 1e-09] <- 1e-8
@@ -18,7 +19,8 @@
   X1 <- mu * (S - L) - Sigma - U
   X2 <- X1 %*% X1 + 4 * mu * diag(dim(X1)[1])
   eig <- eigen(X2, symmetric = TRUE)
-  sqrtX2 <- eig$vectors %*% diag(sqrt(eig$values)) %*% t(eig$vectors)
+  sqrtX2 <-
+    eig$vectors %*% diag(sqrt(eig$values)) %*% t(eig$vectors)
   A <- (X1 + sqrtX2) / (2 * mu)
   
   return(A)
@@ -49,18 +51,23 @@
 }
 
 .updateU.R <- function(A, S, L, U, mu) {
-  
   U <- U + mu * (A - S + L)
   
   return(U)
 }
 
 
-#' @import MASS 
-lrpsadmm.R <- function(Sigma, Lambda1, Lambda2, init,
-                       maxiter, mu, 
-                       abs_tol, rel_tol,
-                       print_progress, print_every,
+#' @import MASS
+lrpsadmm.R <- function(Sigma,
+                       Lambda1,
+                       Lambda2,
+                       init,
+                       maxiter,
+                       mu,
+                       abs_tol,
+                       rel_tol,
+                       print_progress,
+                       print_every,
                        zeros) {
   if (is.null(zeros)) {
     zeros <- 1
@@ -76,31 +83,37 @@ lrpsadmm.R <- function(Sigma, Lambda1, Lambda2, init,
     parameters <- init
     S <- init$S
     L <- init$L
-    U <- init$U 
+    U <- init$U
   }
   
   # Enforce the 0 pattern
   S <- S * zeros
   
-  history <- matrix(NA, nrow=0, ncol=6)
-  colnames(history) <- c('Iteration', 'Objval', 's_norm', 'r_norm', 'eps_pri', 'eps_dual')
+  history <- matrix(NA, nrow = 0, ncol = 6)
+  colnames(history) <-
+    c('Iteration',
+      'Objval',
+      's_norm',
+      'r_norm',
+      'eps_pri',
+      'eps_dual')
   parameters <- list()
   parameters$termcode <- -1
   parameters$termmsg <- "Maximum number of iterations reached."
   for (i in 1:maxiter) {
-    
     # Update A
     A <- .updateA.R(Sigma, S, L, U, mu)
     
     # Update S
     S_old <- S
     S <- .updateS.R(A, L, U, Lambda1, mu, zeros)
-    if(any(diag(S) == 0)) {
+    if (any(diag(S) == 0)) {
       S <- diag(p)
       L <- S * 0
       U <- S * 0
       parameters$termcode <- -2
-      parameters$termmsg <- "Shrinkage too strong: sparse component is empty."
+      parameters$termmsg <-
+        "Shrinkage too strong: sparse component is empty."
       break()
     }
     
@@ -114,24 +127,32 @@ lrpsadmm.R <- function(Sigma, Lambda1, Lambda2, init,
     # Diagnostics
     objval <- .obj_func.R(Sigma, A, S, L, Lambda1, Lambda2)
     
-    r_norm <- norm(A - (S-L), 'F')
-    s_norm <- norm(mu * ((S-L) - (S_old - L_old)), 'F')
-    eps_pri <- p * abs_tol + rel_tol * 
-      max(norm(A, 'F'), norm(S-L, 'F'))
-    eps_dual <- p * abs_tol + rel_tol * norm(mu * U, 'F') 
-    history <- rbind(history, c(i, objval, s_norm, 
+    r_norm <- norm(A - (S - L), 'F')
+    s_norm <- norm(mu * ((S - L) - (S_old - L_old)), 'F')
+    eps_pri <- p * abs_tol + rel_tol *
+      max(norm(A, 'F'), norm(S - L, 'F'))
+    eps_dual <- p * abs_tol + rel_tol * norm(mu * U, 'F')
+    history <- rbind(history, c(i, objval, s_norm,
                                 r_norm, eps_pri, eps_dual))
     
-    if( (s_norm < eps_dual) && (r_norm < eps_pri) ) {
+    if ((s_norm < eps_dual) && (r_norm < eps_pri)) {
       parameters$termcode <- 0
       parameters$termmsg <- 'Convergence Reached.'
       break()
     }
-    if ((print_progress) & (i > print_every)) {
-      if((i %% print_every) == 0) {
-        print(paste(c("Iteration:", "Obj. fun.:", "s_norm:", 
-                      "r_norm:", "eps_pri:", "eps_dual:"), 
-                    history[i,]))
+    if ((print_progress) & (i >= print_every)) {
+      if ((i %% print_every) == 0) {
+        print(paste(
+          c(
+            "Iteration:",
+            "Obj. fun.:",
+            "s_norm:",
+            "r_norm:",
+            "eps_pri:",
+            "eps_dual:"
+          ),
+          history[i, ]
+        ))
       }
     }
     
@@ -145,98 +166,6 @@ lrpsadmm.R <- function(Sigma, Lambda1, Lambda2, init,
   attr(parameters, "class") <- "lrpsadmm"
   
   parameters
-}
-
-#' @useDynLib lrpsadmm
-#' @importFrom Rcpp evalCpp
-#' @import MASS RcppEigen
-lrpsadmm.cppeigen <- function(Sigma,
-                              Lambda1,
-                              Lambda2,
-                              init,
-                              maxiter,
-                              mu,
-                              abs_tol,
-                              rel_tol,
-                              print_progress,
-                              print_every,
-                              zeros) {
-  
-  if (print_progress == FALSE) {
-    print_every = -1
-  }
-  
-  p <- dim(Sigma)[1]
-  has_zeros <- 1
-  if (is.null(zeros)) {
-    has_zeros <- -1
-    zeros <- matrix(1, ncol = 1, nrow = 1)
-  }
-  
-  if (is.null(init)) {
-    S <- diag(p)
-    L <- S * 0.0
-    U <- S * 0.0
-  } else {
-    parameters <- init
-    S <- init$S
-    L <- init$L
-    U <- init$U
-  }
-  
-  # Enforce the 0 pattern
-  if (has_zeros > 0) {
-    S <- S * zeros
-  }
-  A <- matrix(NA, ncol = p, nrow = p)
-  cpp_output <-
-    .Call(
-      '_lrpsadmm_rcppeigen_fit_lrps',
-      PACKAGE = 'lrpsadmm',
-      Sigma,
-      A,
-      S,
-      L,
-      U,
-      zeros,#Zeros
-      Lambda1, #L1
-      Lambda2, #L2
-      mu, # Mu
-      maxiter, # Maxiter
-      rel_tol, # rel tol
-      abs_tol, # abs tol,
-      print_every,
-      has_zeros
-    )
-  
-  history <- cbind(
-    cpp_output$objvals,
-    cpp_output$snorms,
-    cpp_output$rnorms,
-    cpp_output$epspris,
-    cpp_output$epsduals
-  )
-  colnames(history) <-
-    c('Objval', 's_norm', 'r_norm', 'eps_pri', 'eps_dual')
-  history <- as.data.frame(history)
-  parameters <- list()
-  parameters$termcode <- cpp_output$termcode
-  if (parameters$termcode == 0) {
-    parameters$termmsg <- "Convergence Reached."
-  } else if (parameters$termcode == -1) {
-    parameters$termmsg <- "Maximum number of iterations reached."
-  } else if (parameters$termcode == -2) {
-    parameters$termmsg <-
-      "Shrinkage too strong: sparse component is empty."
-  }
-  
-  parameters$S <- cpp_output$S
-  parameters$L <- cpp_output$L
-  parameters$U <- cpp_output$U
-  parameters$history <- history
-  attr(parameters, "class") <- "lrpsadmm"
-  
-  return(parameters)
 }
 
 
@@ -263,9 +192,6 @@ lrpsadmm.cppeigen <- function(Sigma,
 #' of #iterations).
 #' @param zeros A p x p matrix with entries set to 0 or 1. Whereever its entries are
 #' 0, the entries of the estimated S will be forced to 0.
-#' @param backend A character vector. It should be either 'RcppEigen' or 'R'. 
-#' If 'R' then use the pure R implementation, if 'RcppEigen' then use the C++
-#' implementation.
 #' @details
 ##' Given a n x p data matrix X and its empirical correlation matrix
 #' \eqn{\Sigma}, an alternating direction method of multipliers (ADMM) algorithm
@@ -292,8 +218,8 @@ lrpsadmm.cppeigen <- function(Sigma,
 #'  \item{termcode}{An integer. Its value determines whether the algorithm terminated normally or with an error.
 #'  0: Convergence reached. -1: Maxiter reached. -2: Shrinkage too strong.}
 #'  \item{termmsg}{A character vector. The message corresponding to the value \code{termcode}.}
-#'  \item{history}{A numerical dataframe with the objective function at each 
-#'  iterations, the norm and dual norm as well the primal and dual tolerance 
+#'  \item{history}{A numerical dataframe with the objective function at each
+#'  iterations, the norm and dual norm as well the primal and dual tolerance
 #'  criteria for convergence. The algorithm exits when r_norm < eps_pri and s_norm < eps_dual.}
 #'  \item{U}{A p x p matrix. Augmented Lagrangian multiplier. It is stored in order to allow warm starts.}
 #' }
@@ -312,11 +238,11 @@ lrpsadmm.cppeigen <- function(Sigma,
 #' sim.data <- generate.latent.ggm.data(n=2000, p=100, h=5, outlier.fraction = 0.0,
 #'                                      sparsity = 0.02, sparsity.latent = 0.7)
 #' X <- sim.data$obs.data; Sigma <- cor(X) # Sample correlation matrix
-#' 
+#'
 #' ### Fit the estimator for some value of the tuning parameters
 #' lambda <- 0.7; gamma <- 0.1 # The tuning parameters.
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
-#' fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2, 
+#' fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2,
 #'                 abs_tol=1e-06, rel_tol=1e-04)
 #' plot(fit) # Use the S3 method plot
 #' estS <- fit$S # Sparse estimate
@@ -324,7 +250,7 @@ lrpsadmm.cppeigen <- function(Sigma,
 #' estL <- fit$L # Low-rank estimate
 #' plot(eigen(estL)$values) # Visualise the spectrum of the low-rank estimate
 #' plot(fit$history$Objval, type='l') # The log-likelihood from iteration 15 onwards
-#' 
+#'
 #' ### Fit for another value of the tuning parameters and compare cold/warm starts
 #' lambda <- 0.4; gamma <- 0.1 # Change the tuning parameters
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
@@ -339,7 +265,7 @@ lrpsadmm.cppeigen <- function(Sigma,
 #' xleg = 0.5 * nrow(cold.fit$history)
 #' yleg = 0.5 * (max(cold.fit$history$Objval) + min(cold.fit$history$Objval))
 #' legend(x = xleg, y=yleg, legend=c("Cold Start", "Warm Start"), col=c("red", "blue"), lty=c(1,1))
-#' 
+#'
 #' ### Force the sparsity pattern of the sparse component
 #' zeros = 1 * (sim.data$precision.matrix != 0) # A mtrix of 0 and 1.
 #' zeros = zeros[1:100,1:100] # Keep only the observed part
@@ -348,14 +274,14 @@ lrpsadmm.cppeigen <- function(Sigma,
 #' fit.no.zeros <- lrpsadmm(Sigma, l1, l2, abs_tol=1e-06, rel_tol=1e-04)
 #' image(fit.zeros$S!=0) # Comparing the sparsity patterns
 #' image(fit.no.zeros$S!=0)
-#' 
+#'
 #' ### Fit the estimator when the problem is not so well-posed (n close to p)
 #' set.seed(0)
 #' # n = 80, p = 100 with 5 latent variables.
 #' sim.data <- generate.latent.ggm.data(n=80, p=100, h=5, outlier.fraction = 0.0,
 #'                                      sparsity = 0.02, sparsity.latent = 0.7)
 #' X <- sim.data$obs.data; Sigma <- cor(X) # Sample correlation matrix
-#' 
+#'
 #' lambda <- 2; gamma <- 0.1 # Here gamma is fairly small
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
 #' fit.small.gamma <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2)
@@ -368,7 +294,7 @@ lrpsadmm.cppeigen <- function(Sigma,
 #' # Numerical stability and convergence are not guaranteed for such an ill-posed proble.
 #' # Gamma is too high.
 #' plot(fit.large.gamma$history$Objval, type = 'l', xlab= "#Iterations", ylab = "Log-Likelihood")
-#' 
+#'
 #' ### Fit the estimator with a robust estimator of the correlation matrix
 #' # Generate data with 5% of outliers
 #' set.seed(0)
@@ -377,15 +303,15 @@ lrpsadmm.cppeigen <- function(Sigma,
 #' X <- sim.data$obs.data;
 #' Sigma <- cor(X) # Sample correlation matrix
 #' Sigma.Kendall <- Kendall.correlation.estimator(X) # The robust estimator
-#' 
+#'
 #' lambda <- 0.7; gamma <- 0.1 # The tuning parameters.
 #' l1 <- lambda * gamma; l2 <- lambda * (1 - gamma)
 #' # Outliers make the problem very ill-posed
 #' fit <- lrpsadmm(Sigma = Sigma, Lambda1 = l1, Lambda2 = l2,
-#'                 abs_tol=1e-06, rel_tol=1e-04, print_every = 200) 
+#'                 abs_tol=1e-06, rel_tol=1e-04, print_every = 200)
 #' # Use the Kendall based estimator
 #' Kendall.fit <- lrpsadmm(Sigma = Sigma.Kendall, Lambda1 = l1,
-#'                         Lambda2 = l2, abs_tol=1e-06, rel_tol=1e-04) 
+#'                         Lambda2 = l2, abs_tol=1e-06, rel_tol=1e-04)
 #' image(fit$S!=0)
 #' image(Kendall.fit$S!=0)
 #' plot(fit$history$Objval, xlab="#Iterations", ylab="Log-Likelihood")
@@ -403,26 +329,20 @@ lrpsadmm <- function(Sigma,
                      rel_tol = 1e-02,
                      print_progress = TRUE,
                      print_every = 10,
-                     zeros = NULL,
-                     backend='RcppEigen') {
-  
-  if (backend == 'R') {
-    res <- lrpsadmm.R(Sigma, Lambda1, Lambda2, init, 
-                      maxiter, mu, abs_tol, rel_tol, 
-                      print_progress, print_every, zeros)
-  }
-  else if(backend == 'RcppEigen') {
-    res <- lrpsadmm.cppeigen(Sigma, Lambda1, Lambda2, 
-                             init, maxiter, mu, 
-                             abs_tol, rel_tol, 
-                             print_progress, 
-                             print_every, zeros)
-    
-  }
-  else {
-    print("Error. 'backend' argument must be either 'R' or 'RcppEigen'.")
-    return(NULL)
-  }
+                     zeros = NULL) {
+  res <- lrpsadmm.R(
+    Sigma,
+    Lambda1,
+    Lambda2,
+    init,
+    maxiter,
+    mu,
+    abs_tol,
+    rel_tol,
+    print_progress,
+    print_every,
+    zeros
+  )
 }
 
 #' @title Plotting function for 'lrpsadmm' Objects

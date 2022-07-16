@@ -21,8 +21,7 @@ lrpsadmm.cv(
   mu = 1,
   verbose = FALSE,
   seed = NA,
-  zeros = NULL,
-  backend = "RcppEigen"
+  zeros = NULL
 )
 }
 \arguments{
@@ -65,8 +64,6 @@ generate according a geometric sequence between lambda.max and lambda.max * lamb
 
 \item{zeros}{A p x p matrix with entries set to 0 or 1. Whereever its entries are
 0, the entries of the estimated S will be forced to 0.}
-
-\item{backend}{The \code{backend} parameter of lrpsadmm. It is one of 'R' or 'RcppEigen'.}
 }
 \value{
 An object of class lrpsadmmcv.

@@ -63,7 +63,6 @@
 #' @param seed Set the seed of the random number generator used for the K folds.
 #' @param zeros A p x p matrix with entries set to 0 or 1. Whereever its entries are
 #' 0, the entries of the estimated S will be forced to 0.
-#' @param backend The \code{backend} parameter of lrpsadmm. It is one of 'R' or 'RcppEigen'. 
 #' 
 #' @return
 #'   An object of class lrpsadmmcv.
@@ -161,8 +160,7 @@ lrpsadmm.cv <- function(X,
                         mu = 1.0,
                         verbose = FALSE,
                         seed = NA,
-                        zeros = NULL,
-                        backend='RcppEigen') {
+                        zeros = NULL) {
   n <- dim(X)[1]
   if (!is.na(seed)) {
     set.seed(seed)
@@ -191,8 +189,7 @@ lrpsadmm.cv <- function(X,
       mu,
       verbose,
       seed,
-      zeros,
-      backend
+      zeros
     )
     all.paths[[counter]]$gamma <- gamma
     all.paths[[counter]]$best.fit <-
@@ -215,7 +212,7 @@ lrpsadmm.cv <- function(X,
   toReturn
 }
 
-#' @import RSpectra Matrix
+#' @import Matrix
 #' @importFrom stats cor sd
 .cv.lrps.one.gamma <- function(X,
                                gamma,
@@ -233,8 +230,7 @@ lrpsadmm.cv <- function(X,
                                mu,
                                verbose,
                                seed,
-                               zeros,
-                               backend) {
+                               zeros) {
   Sigma <- covariance.estimator(X)
   p <- dim(Sigma)[1]
   n <- dim(X)[1]
@@ -266,8 +262,7 @@ lrpsadmm.cv <- function(X,
       max.iter = max.iter,
       mu = mu,
       verbose = verbose,
-      zeros=zeros,
-      backend=backend
+      zeros=zeros
     )
   if (verbose) {
     print(paste("### Now performing ", n.folds, " fold cross validation. ###"))
@@ -305,8 +300,7 @@ lrpsadmm.cv <- function(X,
         abs_tol = abs_tol,
         maxiter = max.iter,
         mu = mu,
-        zeros=zeros,
-        backend=backend
+        zeros=zeros
       )
       if (fitll$termcode == -2) {
         ll <- NaN
@@ -318,7 +312,8 @@ lrpsadmm.cv <- function(X,
       A <- fitll$S - fitll$L
       evals <- tryCatch({
         # In some cases this does not converge.
-        RSpectra::eigs_sym(A, min(n - 1, p - 1))$values
+        eigen(A, symmetric = TRUE, only.values = TRUE)$values
+        #RSpectra::eigs_sym(A, min(n - 1, p - 1))$values
       },
       error = function(e) {
         print(e)
