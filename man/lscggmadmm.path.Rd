@@ -6,7 +6,7 @@
 \usage{
 lscggmadmm.path(
   SigmaZ,
-  SigmZX,
+  SigmaZX,
   SigmaX,
   gamma,
   lambdas = NULL,

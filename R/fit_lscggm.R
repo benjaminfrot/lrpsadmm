@@ -7,8 +7,8 @@ lscggm_loglikelihood.R <- function(SigZ, SigZX, SigX, AX, AZX) {
   AXi <- eigAX$vectors %*% (diag(1 / s)) %*% t(eigAX$vectors)
   ll <- -sum(log(s))
   ll <-
-    ll + sum(diag(SigmaX %*% AX)) + 2 * sum(diag(SigmaZX %*% t(AZX)))
-  ll <- ll +  sum(diag(AXi %*% t(AZX) %*% SigmaZ %*% AZX))
+    ll + sum(diag(SigX %*% AX)) + 2 * sum(diag(SigZX %*% t(AZX)))
+  ll <- ll +  sum(diag(AXi %*% t(AZX) %*% SigZ %*% AZX))
   
   return(ll)
 }
@@ -48,7 +48,7 @@ lscggm_updateA.R <- function(SigZ,
                              tol,
                              SylR,
                              SylU) {
-  A = 2 * SigmaZ # Matrix A in the Sylvester equation.
+  A = 2 * SigZ # Matrix A in the Sylvester equation.
   AX <- SX * 0
   p = dim(SigX)[1]
   m = dim(SigZ)[1]

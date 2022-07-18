@@ -123,7 +123,7 @@
 #' @import Matrix
 #' @export
 lscggmadmm.path <- function(SigmaZ,
-                          SigmZX,
+                          SigmaZX,
                           SigmaX,
                           gamma,
                           lambdas = NULL,
