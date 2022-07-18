@@ -50,7 +50,7 @@ generate.latent.ggm.data <- function(n, p, h, sparsity=0.02, sparsity.latent=0.7
   S <- matrix(runif(n=p**2, min=-1) * rbinom(n=p**2, size = 1,
                                                    prob = sparsity),
               ncol=p)
-  S[1:100, 1:100] <- rnorm(n=100 * 100)
+  #S[1:100, 1:100] <- rnorm(n=100 * 100)
   L <- (diag(h))
   SLX <- matrix(runif(n=p*h, min=-1) * rbinom(n=p*h, size = 1,
                                              prob = sparsity.latent),
