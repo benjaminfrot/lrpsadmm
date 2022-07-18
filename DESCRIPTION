@@ -14,4 +14,7 @@ Imports: MASS,
     cvTools,
     Matrix,
     RColorBrewer,
+    Rcpp (>= 1.0.0), 
+    RcppEigen (>= 0.3.3.5.0)
+LinkingTo: Rcpp, RcppEigen
 License: MIT
