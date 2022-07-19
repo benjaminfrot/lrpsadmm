@@ -33,6 +33,22 @@ lsscgm_obj_func.R <- function(SigZ,
   return(ll + p1 + p2)
 }
 
+solve.sylvester <- function(Q, evalsA, evalsB, evecsA, evecsB) {
+  
+  U <- evecsA
+  R <- diag(evalsA)
+  V <- evecsB
+  Sinv <- diag(1 / evalsB)
+  
+  F <- t(U) %*% Q %*% V
+  ones <- matrix(1, nrow=m, ncol=p)
+  factor <- R %*% ones %*% Sinv + ones
+  Ysol <- (F %*% Sinv) / factor
+  Xsol <- U %*% Ysol %*% t(V)
+  
+  Xsol
+}
+
 lscggm_updateA.R <- function(SigZ,
                              SigZX,
                              SigX,
@@ -46,8 +62,7 @@ lscggm_updateA.R <- function(SigZ,
                              UZX,
                              mu,
                              tol,
-                             SylR,
-                             SylU) {
+                             eigen2SigZ) {
   A = 2 * SigZ # Matrix A in the Sylvester equation.
   AX <- SX * 0
   p = dim(SigX)[1]
@@ -69,27 +84,15 @@ lscggm_updateA.R <- function(SigZ,
     B = mu * AX
     eigB <- eigen(B, symmetric = TRUE)
     Q = -TZX %*% AX
-    out = .Call(
-      '_lrpsadmm_rcppeigen_solve_sylvester',
-      PACKAGE = 'lrpsadmm',
-      A,
-      SylR,
-      SylU,
-      B,
-      diag(eigB$values),
-      eigB$vectors,
-      Q
-    )
     AZXold <- AZX
-    AZX = out$AZX
-    # For Xest a solution of Sylvester's equation,
-    # we compute Qest = A Xest + XestB and return
-    # ||Q - Qest||_F.
-    diff = out$diff
+    # Pure R Solution
+    AZX <- solve.sylvester(Q, eigen2SigZ$values, eigB$values, 
+                           eigen2SigZ$vectors, eigB$vectors)
+    
     d_normX <- norm(AX - AXold, 'F') ** 2
     d_normZX <- norm(AZX - AZXold, 'F') ** 2
     d_norm <- sqrt(d_normX + d_normZX)
-    if ((i > 1) && (d_norm < tol)) {
+    if ((i > 5) && (d_norm < tol)) {
       break()
     }
   }
@@ -160,7 +163,7 @@ lscggm_updateL.R <- function(AX, SX, UX,
     diffX <- norm(old.XX - XX, 'F') ** 2
     diffZX <- norm(old.XZX - XZX, 'F') ** 2
     diff <- sqrt(diffX + diffZX)
-    if (diff < tol) {
+    if ((i > 2) && (diff < tol)) {
       break()
     }
   }
@@ -298,9 +301,7 @@ lscggm_updateU.R <- function(AX, SX, LX, UX,
 #' # The Kendall estimator produces far better results.
 #' # It is not affected by the 5% of outliers
 #' plot(my.robust.path, ground.truth)
-#' @useDynLib lrpsadmm
-#' @importFrom Rcpp evalCpp
-#' @import MASS RcppEigen
+#' @import MASS
 #' @export
 lscggmadmm <- function(SigmaZ,
                        SigmaZX,
@@ -324,10 +325,7 @@ lscggmadmm <- function(SigmaZ,
   s[s != 0] = 1.0 / (s[s != 0])
   inv_sqrt_SigZ = Zeig$vectors %*% diag(s) %*% t(Zeig$vectors)
   
-  out = .Call('_lrpsadmm_rcppeigen_Schur',
-              PACKAGE = 'lrpsadmm', 2 * SigmaZ)
-  SylU <- out$U
-  SylR <- out$R
+  eigen2SigZ <- eigen(2 * SigmaZ, symmetric = T)
   
   p <- dim(SigmaX)[1]
   m <- dim(SigmaZ)[1]
@@ -383,8 +381,7 @@ lscggmadmm <- function(SigmaZ,
         mu = mu,
         inv_sqrt_SigZ = inv_sqrt_SigZ,
         tol = eps_dual,
-        SylR = SylR,
-        SylU = SylU
+        eigen2SigZ = eigen2SigZ
       )
     AX = out$AX
     AZX = out$AZX
