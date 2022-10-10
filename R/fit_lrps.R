@@ -170,7 +170,7 @@ lrpsadmm.R <- function(Sigma,
 
 
 #'
-#' Fit the the low-rank plus sparse estimator using the alternating method direction of multipliers
+#' Fit the low-rank plus sparse estimator using the alternating method direction of multipliers
 #' @description
 #' Given a n x p data matrix X and its empirical correlation matrix
 #' \eqn{\Sigma}, an alternating direction method of multipliers (ADMM) algorithm

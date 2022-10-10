@@ -39,6 +39,8 @@ solve.sylvester <- function(Q, evalsA, evalsB, evecsA, evecsB) {
   R <- diag(evalsA)
   V <- evecsB
   Sinv <- diag(1 / evalsB)
+  m <- ncol(R)
+  p <- nrow(Sinv)
   
   F <- t(U) %*% Q %*% V
   ones <- matrix(1, nrow=m, ncol=p)
@@ -180,129 +182,96 @@ lscggm_updateU.R <- function(AX, SX, LX, UX,
   return(list(UX = UX, UZX = UZX))
 }
 
-#' @title Compute the LRpS estimator along a path (for a fixed value of \eqn{gamma})
+
+#'
+#' Fit the conditional low-rank plus sparse estimator using the alternating method direction of multipliers
 #' @description
-#' The penalty for the LRpS estimator is written as \eqn{\lambda_1 ||S||_1 + \lambda_2 Trace(L)} in the
-#' objective function of \code{lrpsadmm}.
-#' This can be equivalently rewritten in terms of the regularisation parameters \eqn{\lambda} and \eqn{\gamma} as follows
-#' \deqn{\lambda \gamma ||S||_1 + \lambda (1 - \gamma) Trace(L),}
-#' for \eqn{\gamma \in (0, 1)}.
-#' This function estimates the path of the estimator for a fixed value of \eqn{\gamma} (which controls the trade-off between
-#' the two penalties) by varying the value of \eqn{\lambda}. See the documentation of \code{lrpsadmm} and references therein for
-#' more details.
+#' The estimator fits a low-rank plus sparse estimator to a set of observed variables X
+#' conditionally on a set of variables Z. 
+#' Given a n x p data matrix X with empirical correlation matrix
+#' \eqn{\Sigma_X}, and an n x m data matrix Z with empirical correlation matrix \eqn{\Sigma_Z}, 
+#' an alternating direction method of multipliers (ADMM) algorithm is fitted to obtain the solutions \eqn{S, L} to
+#' \deqn{(S, L) = argmin_{A, B}  -loglikelihood(A, B, ; \Sigma_Z, \Sigma_X) + \lambda_1 ||A||_1 + \lambda_2 ||B||_\ast),}
+#' subject to \eqn{A_X - B_X > 0} and \eqn{B_X \ge 0}.
+#' loglikelihood is the log-likelihood of a conditional Gaussian graphical model (see reference
+#' for notations and further details).
+#' @param SigmaX An estimate of the correlation matrix of X. p x p matrix.
+#' @param SigmaZX An estimate of the cross-correlation matrix between Z and X. p x m matrix.
+#' @param SigmaZ An estimate of the correlation matrix of Z. m x m matrix.
+#' @param Lambda1 Penalty on the l1 norm of S
+#' @param Lambda2 Penalty on the sum of the singular values of L
+#' @param init The output of a previous run of the algorithm. For warm starts. Defaults to NULL.
+#' @param maxiter Maximal number of iterations
+#' @param mu Step size of the ADMM algorithm.
+#' @param rel_tol Relative tolerance required to stop the algorithm. The algorithm
+#' stops when both the change in parameters is below tolerance and the constraints
+#' are satisfied. Default 1e-02.
+#' @param abs_tol Absolute tolerance required to stop the algorithm. Default 1e-04.
+#' @param print_progress Whether the algorithm should report on its progress.
+#' @param print_every How often should the algorithm report on its progress (in terms
+#' of #iterations).
 #' @details
-#' The function \code{lrpsadmm} is fitted for successive values of \eqn{\lambda} using warm starts.
-#' The sequence of values of \eqn{\lambda} can be provided directly by the user.
-#' It is automatically sorted in decreasing order.
-#' By default, a decreasing sequence of 20 values within a reasonable range is selected as follows.
-#' We set \eqn{\lambda_{max} = \max_{ij, i \neq j} |\Sigma_{ij}|/\gamma} and
-#' \eqn{\lambda_{min} = \lambda_{max}} * \code{lambda.ratio}; then
-#' 20 values between \eqn{\lambda_{max}} and \eqn{\lambda_{min}} are taken following
-#' a geometric progression.
+#' Given a n x p data matrix X with empirical correlation matrix
+#' \eqn{\Sigma_X}, and an n x m data matrix Z with empirical correlation matrix \eqn{\Sigma_Z}, 
+#' an alternating direction method of multipliers (ADMM) algorithm is fitted to obtain the solutions \eqn{S, L} to
+#' \deqn{(S, L) = argmin_{A, B}  -loglikelihood(A, B, ; \Sigma_Z, \Sigma_X) + \lambda_1 ||A||_1 + \lambda_2 ||B||_\ast),}
+#' subject to \eqn{A_X - B_X > 0} and \eqn{B_X \ge 0}.
+#' loglikelihood is the log-likelihood of a conditional Gaussian graphical model (see reference
+#' for notations and further details).
+#' This is the estimator suggested in Frot, Jostins and McVean.
 #'
-#' Because it does not make much sense to fit this estimator when the sparse estimate S becomes too dense
-#' or if the rank of the low-rank estimate L becomes too high, the computation of the path is aborted
-#' when the sparsity of S reaches \code{max.sparsity} or when the rank of L reaches \code{max.rank}.
+#' The optimisation problem is decomposed as a three-block ADMM optimisation problem, as described in Ye et al.
+#' Because it is a so-called consensus problem, the ADMM is guaranteed to converge.
 #'
-#' @param Sigma A p x p matrix. An estimate of the correlation matrix
-#' @param gamma A real between 0 and 1. The value of the tuning parameter gamma in the
-#' parametrisation of the penalty described avove. This is the trade-off between the sparse and trace penalties.
-#' @param lambdas A decreasing sequence of values of lambda. See Details for the default value.
-#' @param lambda.max A positive real. Maximum value of lambda. See Details.
-#' @param lambda.ratio A real between 0 and 1. The smallest value of lambda is given by lambda.max * lambda.ratio. See Details.
-#' @param n.lambdas A positive integer. The number of values of lambda to
-#' generate according a geometric sequence between lambda.max and lambda.max * lambda.ratio. See Details.
-#' @param max.sparsity A real between 0 and 1. Abort the computation of the path if S becomes denser than this value.
-#' @param max.rank A real between 0 and 1. Abort the computuation of the path if the rank of L becomes higher than this value.
-#' @param rel_tol \code{rel_tol} parameter of the \code{lrpsadmm} function.
-#' @param abs_tol \code{rel_tol} parameter of the \code{lrpsadmm} function.
-#' @param max.iter \code{max.iter} parameter of the \code{lrpsadmm} function.
-#' @param mu \code{mu} parameter of the \code{lrpsadmm} function.
-#' @param verbose A boolean. Whether to print the value of lambda, gamma, sparsity of S and rank of L after each fit.
-#' @param zeros A p x p matrix with entries set to 0 or 1. Whereever its entries are
-#' 0, the entries of the estimated S will be forced to 0.
-#
+#' The tuning parameters \eqn{\lambda_1} and \eqn{\lambda_2} are typically reparametrised as
+#' \eqn{\lambda_1 = \lambda \gamma} and \eqn{\lambda_2 = \lambda (1 - \gamma)}, for \eqn{\gamma \in (0,1)}.
+#' Here, for a fixed \eqn{\gamma}, \eqn{\lambda} controls the overall shrinkage along the path defined by \eqn{\gamma}.
+#' \eqn{\gamma} controls the trade off on the penalties between sparse and low-rank components.
+#'
+#' For numerical stability, a smaller value of \eqn{\gamma} is preferable when the number of samples n is close to p. 
+#' See examples.
+#'
 #' @return
-#'   An object of class lrpsaddmpath. This is essentially a list (see examples). Each element is itself a list with keys:
-#'   \describe{
-#'      \item{lambda}{Value of lambda used for that fit. Recall that the value of the tuning parameters \eqn{\lambda_1, \lambda_2}
-#'      is given by \eqn{\lambda_1 = lambda * gamma} and \eqn{\lambda_2 = lambda * (1 - gamma)}}
-#'      \item{gamma}{Value of gamma used for that fit. }
-#'      \item{lambda1}{Corresponds to the parameter \code{l1} given as argument to the \code{lrpsadmm} function.
-#'      lambda1 = lambda * gamma}
-#'      \item{lambda2}{Corresponds to the parameter \code{l2} given as argument to the \code{lrpsadmm} function.
-#'      lambda2 = lambda * (1 - gamma)}
-#'      \item{number.of.edges}{Number of edges in the estimated sparse graphical model.}
-#'      \item{rank.L}{Rank of the estimated low-rank matrix L.}
-#'      \item{sparsity}{Sparsity of the estimated sparse matrix. This is fraction of entries that are non-zero.}
-#'      \item{fit}{An object of class lrpsadmm.
-#'      This is the outcome of calling \code{lrpsadmm} with tuning parameters l1 = lambda * gamma and l2 = lambda (1 - gamma).
-#'      See the documentation of the function \code{lrpsadmm} for more information.}
-#'   }
-#' @examples
+#' An S3 object of class lscggm It is essentially a list with keys:
+#' \describe{
+#'  \item{SX}{A p x p matrix. The sparse estimate SX.}
+#'  \item{LX}{A p x p matrix. The low-rank estimate LX.}
+#'  \item{SZX}{A p x p matrix. The sparse estimate SZX.}
+#'  \item{LZX}{A p x p matrix. The low-rank estimate LZX.}
+#'  \item{UX}{A p x p matrix. Augmented Lagrangian multiplier. It is stored in order to allow warm starts.}
+#'  \item{AX}{A p x p matrix. Used interall. Stored to allow warm starts.}
+#'  \item{UZX}{A p x p matrix. Augmented Lagrangian multiplier. It is stored in order to allow warm starts.}
+#'  \item{AZX}{A p x p matrix. Used internally. Stored to allow warm starts}
+
+#'  \item{termcode}{An integer. Its value determines whether the algorithm terminated normally or with an error.
+#'  0: Convergence reached. -1: Maxiter reached. -2: Shrinkage too strong.}
+#'  \item{termmsg}{A character vector. The message corresponding to the value \code{termcode}.}
+#'  \item{history}{A numerical dataframe with the objective function at each
+#'  iterations, the norm and dual norm as well the primal and dual tolerance
+#'  criteria for convergence. The algorithm exits when r_norm < eps_pri and s_norm < eps_dual.}
+#' }
 #'
-#' set.seed(0)
-#' # Generate data with a well-powered dataset
+#' @references
+#' B Frot, L Jostins, G McVean. Graphical model selection for Gaussian conditional random fields in the presence of latent variables
+#' Journal of the American Statistical Association 114 (526), 723-734
+#' 
+#' Chandrasekaran, Venkat; Parrilo, Pablo A.; Willsky, Alan S. Latent variable graphical model selection via convex optimization.
+#' Ann. Statist. 40 (2012), no. 4, 1935--1967. doi:10.1214/11-AOS949. \url{https://projecteuclid.org/euclid.aos/1351602527}
+#'
+#' Gui-Bo Ye, Yuanfeng Wang, Yifei Chen, Xiaohui Xie;
+#' Efficient Latent Variable Graphical Model Selection via Split Bregman Method.
+#' \url{https://arxiv.org/abs/1110.3076}
+#'
+#' @examples
+#' set.seed(1)
+#' # Generate data for a well-powered dataset
 #' sim.data <- generate.latent.ggm.data(n=2000, p=100, h=5, outlier.fraction = 0.0,
 #'                                      sparsity = 0.02, sparsity.latent = 0.7)
 #' X <- sim.data$obs.data; Sigma <- cor(X) # Sample correlation matrix
 #'
-#'
-#' gamma <- 0.1 # Some reasonble value for gamma
-#' # We ask for 30 lambdas, but the sparse graph becomes too dense so the
-#' # computation is stopped.
-#' my.path <- lrpsadmm.path(Sigma = Sigma, gamma = gamma,
-#'                          lambda.ratio = 1e-03, n.lambdas = 30,
-#'                          verbose = TRUE, rel_tol = 1e-04, abs_tol=1e-06)
-#'
-#' # This time let us ask for 30 values,
-#' # but let us narrow down the range by using a
-#' # a smaller ratio
-#' my.path <- lrpsadmm.path(Sigma = Sigma, gamma = gamma,
-#'                          lambda.max = 0.96, lambda.ratio = 0.1, n.lambdas = 30,
-#'                          verbose = TRUE, rel_tol = 1e-04, abs_tol=1e-06)
-#'
-#' # Plot some basic information about the path
-#' plot(my.path)
-#' # Look at the first graph in the path
-#' plot(my.path[[1]]$fit)
-#' # Because this is simulated data, we know the ground truth
-#' # Let us use it to compute the precsion and recall metrics
-#' # along the path
-#' ground.truth <- sim.data$precision.matrix[1:100, 1:100]
-#' # Remove the elements along the diagonal. Keep a matrix of 0s and 1s
-#' ground.truth <- 1 * (( ground.truth - diag(diag(ground.truth)) ) !=0)
-#' # There is a new plot with the precision / recall curve
-#' plot(my.path, ground.truth = ground.truth)
-#'
-#' ### Let us use a robust estimator of the correlation matrix
-#' # Generate data with 5% of outliers
-#' set.seed(0)
-#' sim.data <- generate.latent.ggm.data(n=2000, p=100, h=5, outlier.fraction = 0.05,
-#'                                      sparsity = 0.02, sparsity.latent = 0.7)
-#' ground.truth <- sim.data$precision.matrix[1:100, 1:100]
-#' # Remove the elements along the diagonal. Keep a matrix of 0s and 1s
-#' ground.truth <- 1 * (( ground.truth - diag(diag(ground.truth)) ) !=0)
-#' X <- sim.data$obs.data;
-#' Sigma <- cor(X) # Sample correlation matrix
-#' Sigma.Kendall <- Kendall.correlation.estimator(X) # The robust estimator
-#'
-#' # With that many strong outliers, using the sample corr. mat.
-#' # is not going to work well
-#' gamma <- 0.2
-#' my.path <- lrpsadmm.path(Sigma = Sigma, gamma = gamma,
-#'                          lambda.ratio = 1e-02, n.lambdas = 30, verbose = TRUE)
-#' # Use another estimator for the correlation matrix:
-#' my.robust.path <- lrpsadmm.path(Sigma = Sigma.Kendall, gamma = gamma,
-#'                                 lambda.ratio = 1e-01, n.lambdas = 30, verbose = TRUE)
-#' # The output of the sample correlation path is poor (in terms of prec/recall)
-#' # This is pretty much noise
-#' plot(my.path, ground.truth)
-#' # The Kendall estimator produces far better results.
-#' # It is not affected by the 5% of outliers
-#' plot(my.robust.path, ground.truth)
-#' @import MASS
 #' @export
+#' @seealso lscggm.cv lscggm.path
+#' @import MASS
 lscggmadmm <- function(SigmaZ,
                        SigmaZX,
                        SigmaX,
@@ -414,7 +383,6 @@ lscggmadmm <- function(SigmaZ,
     LX <- out$LX
     LZX <- out$LZX
     
-    
     # Update U
     out <- lscggm_updateU.R(AX, SX, LX, UX,
                             AZX, SZX, LZX, UZX,
@@ -480,7 +448,8 @@ lscggmadmm <- function(SigmaZ,
   parameters$LZX <- LZX
   parameters$UZX <- UZX
   parameters$AZX <- AZX
-  
+  parameters$AX <- AX
+    
   parameters$history <- as.data.frame(history)
   
   attr(parameters, "class") <- "lscggmadmm"

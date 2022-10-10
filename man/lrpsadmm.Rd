@@ -2,7 +2,7 @@
 % Please edit documentation in R/fit_lrps.R
 \name{lrpsadmm}
 \alias{lrpsadmm}
-\title{Fit the the low-rank plus sparse estimator using the alternating method direction of multipliers}
+\title{Fit the low-rank plus sparse estimator using the alternating method direction of multipliers}
 \usage{
 lrpsadmm(
   Sigma,

@@ -41,7 +41,7 @@
 #' @import mvtnorm
 #' @importFrom stats runif rbinom
 #' @export
-simulate.latent.ggm.data <- function(n, p, h, sparsity=0.02, sparsity.latent=0.7,
+generate.latent.ggm.data <- function(n, p, h, sparsity=0.02, sparsity.latent=0.7,
                           outlier.fraction=0) {
   sparsity <- sparsity * 0.5
   if( h <= 0 ) stop('The number of latent variables h must be > 0.')
